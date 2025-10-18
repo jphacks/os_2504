@@ -1,0 +1,19 @@
+name: "✨ Feature Request (機能要望)"
+description: "新しいライブラリの追加や既存ライブラリの改善を提案する．"
+title: "[FEAT]: "
+labels: ["enhancement", "feature-request"]
+body:
+  - type: textarea
+    id: content
+    attributes:
+      label: "新ライブラリの追加・改善内容 (Describe the Feature Request)"
+      description: "内容を具体的に記述してください．"
+      placeholder: "例: A というライブラリを追加する．B アルゴリズムを追加する．"
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "その他 (Additional Context)"
+      description: "その他，補足があれば記述してください．"
+  
