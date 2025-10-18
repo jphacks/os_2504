@@ -5,6 +5,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import roomsRouter from './routes/rooms.js';
+import restaurantsRouter from './routes/restaurants.js';
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
 });
 
 app.use('/api/rooms', roomsRouter);
+app.use('/api/restaurants', restaurantsRouter);
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   void _next;

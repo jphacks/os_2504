@@ -1,15 +1,18 @@
 import crypto from 'node:crypto';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
 import { db } from './db/client.js';
 import {
   likes,
   members,
+  ratings,
   restaurants,
   roomRestaurants,
   rooms,
   roomSettings,
 } from '../db/schema.js';
+import { sampleRestaurants } from './sample-data.js';
+import { stableUuid } from './utils/stable-uuid.js';
 
 type RoomRow = InferSelectModel<typeof rooms>;
 type RoomSettingsRow = InferSelectModel<typeof roomSettings>;
@@ -72,6 +75,20 @@ export interface RestaurantView {
   google_maps_url: string | null;
 }
 
+export interface RestaurantDetail extends RestaurantView {
+  phone_number: string | null;
+  website: string | null;
+  opening_hours: Record<string, unknown> | null;
+}
+
+export interface RestaurantReview {
+  id: string;
+  author_name: string | null;
+  rating: number | null;
+  text: string | null;
+  time: string | null;
+}
+
 export interface RankingItem {
   place_id: string;
   name: string;
@@ -99,63 +116,7 @@ const rawShareBase =
   (process.env.NODE_ENV === 'production' ? 'https://mogfinder.app' : 'http://localhost:5173');
 const SHARE_BASE_URL = `${rawShareBase.replace(/\/+$/, '')}/r/`;
 
-const SAMPLE_RESTAURANTS: Array<{
-  place_id: string;
-  name: string;
-  address: string;
-  rating: number;
-  user_ratings_total: number;
-  photo_urls: string[];
-  types: string[];
-  latitude: number;
-  longitude: number;
-  summary_simple: string;
-  summary_detail: string;
-  google_maps_url: string;
-}> = [
-  {
-    place_id: 'sample-izakaya-1',
-    name: 'トリキン 神田店',
-    address: '東京都千代田区内神田1-1-1',
-    rating: 4.2,
-    user_ratings_total: 230,
-    photo_urls: ['https://picsum.photos/seed/izakaya1/640/480'],
-    types: ['izakaya', 'japanese'],
-    latitude: 35.691,
-    longitude: 139.768,
-    summary_simple: '焼き鳥が人気・0.3km',
-    summary_detail: 'コスパの良い焼き鳥が楽しめる居酒屋。少人数の飲み会に最適。',
-    google_maps_url: 'https://maps.google.com/?cid=sample-izakaya-1',
-  },
-  {
-    place_id: 'sample-bistro-1',
-    name: 'Bistro Sakura',
-    address: '東京都千代田区鍛冶町2-2-2',
-    rating: 4.5,
-    user_ratings_total: 120,
-    photo_urls: ['https://picsum.photos/seed/bistro1/640/480'],
-    types: ['bistro', 'western'],
-    latitude: 35.689,
-    longitude: 139.77,
-    summary_simple: '女子会向け・0.5km',
-    summary_detail: 'ワインと創作料理が楽しめるビストロ。雰囲気重視の会におすすめ。',
-    google_maps_url: 'https://maps.google.com/?cid=sample-bistro-1',
-  },
-  {
-    place_id: 'sample-ramen-1',
-    name: '拉麺 龍神',
-    address: '東京都千代田区外神田3-3-3',
-    rating: 4.0,
-    user_ratings_total: 540,
-    photo_urls: ['https://picsum.photos/seed/ramen1/640/480'],
-    types: ['ramen'],
-    latitude: 35.7,
-    longitude: 139.77,
-    summary_simple: '深夜営業・1.0km',
-    summary_detail: '濃厚魚介スープが人気のラーメン店。二次会の締めにもぴったり。',
-    google_maps_url: 'https://maps.google.com/?cid=sample-ramen-1',
-  },
-];
+const SAMPLE_RESTAURANTS = sampleRestaurants;
 
 const preparationTimers = new Map<string, NodeJS.Timeout[]>();
 
@@ -293,6 +254,9 @@ async function seedSampleRestaurants(roomId: string): Promise<void> {
           summarySimple: sample.summary_simple,
           summaryDetail: sample.summary_detail,
           googleMapsUrl: sample.google_maps_url,
+          phoneNumber: sample.phone_number ?? null,
+          website: sample.website ?? null,
+          openingHours: sample.opening_hours ?? null,
         })
         .onConflictDoNothing({ target: restaurants.placeId });
     }
@@ -307,6 +271,24 @@ async function seedSampleRestaurants(roomId: string): Promise<void> {
           })),
         )
         .onConflictDoNothing({ target: [roomRestaurants.roomId, roomRestaurants.placeId] });
+    }
+
+    for (const sample of SAMPLE_RESTAURANTS) {
+      if (!sample.reviews?.length) continue;
+      for (const review of sample.reviews) {
+        const reviewId = stableUuid(`${roomId}:${sample.place_id}:${review.author_name}:${review.time}`);
+        await tx
+          .insert(ratings)
+          .values({
+            id: reviewId,
+            placeId: sample.place_id,
+            authorName: review.author_name,
+            rating: review.rating,
+            text: review.text,
+            time: new Date(review.time),
+          })
+          .onConflictDoNothing({ target: ratings.id });
+      }
     }
   });
 }
@@ -325,6 +307,15 @@ function toRestaurantView(row: RestaurantRow): RestaurantView {
     summary_simple: row.summarySimple ?? null,
     summary_detail: row.summaryDetail ?? null,
     google_maps_url: row.googleMapsUrl ?? null,
+  };
+}
+
+function toRestaurantDetail(row: RestaurantRow): RestaurantDetail {
+  return {
+    ...toRestaurantView(row),
+    phone_number: row.phoneNumber ?? null,
+    website: row.website ?? null,
+    opening_hours: (row.openingHours as Record<string, unknown> | null) ?? null,
   };
 }
 
@@ -510,6 +501,33 @@ export async function ensureRestaurantsPrepared(roomId: string): Promise<Restaur
     rows = await fetchRestaurantsForRoom(roomId);
   }
   return rows.map(toRestaurantView);
+}
+
+export async function getRestaurantDetail(placeId: string): Promise<RestaurantDetail | undefined> {
+  const result = await db
+    .select()
+    .from(restaurants)
+    .where(eq(restaurants.placeId, placeId))
+    .limit(1);
+  const [row] = result;
+  if (!row) return undefined;
+  return toRestaurantDetail(row);
+}
+
+export async function listRestaurantReviews(placeId: string): Promise<RestaurantReview[]> {
+  const rows = await db
+    .select()
+    .from(ratings)
+    .where(eq(ratings.placeId, placeId))
+    .orderBy(desc(ratings.time), desc(ratings.createdAt));
+
+  return rows.map((row) => ({
+    id: row.id,
+    author_name: row.authorName ?? null,
+    rating: row.rating ?? null,
+    text: row.text ?? null,
+    time: row.time ? row.time.toISOString() : null,
+  }));
 }
 
 export async function recordLike(input: RecordLikeInput): Promise<LikeView> {
