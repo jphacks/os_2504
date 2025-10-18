@@ -19,7 +19,31 @@ task dev
 - API: http://localhost:3000/api/health
 - DB GUI: http://localhost:8080 (Adminer)
 
-`task dev`（= Docker Compose）で Vite・Express・PostgreSQL をまとめて起動します。`.env` の `DATABASE_URL` は Docker 内の Postgres を指すようにしてください。
+初回のみ依存をインストールするため起動に時間がかかります。`docker-compose.dev.yml` で `node_modules` をボリューム化しているため、2回目以降は高速に立ち上がります。`.env` の `DATABASE_URL` は Docker 内の Postgres を指すようにしてください。
+
+### サンプルデータ投入
+
+```bash
+task db:seed
+```
+
+Drizzle スキーマに対応したダミー店舗／レビューが PostgreSQL に投入され、フロント・API の実動作確認が容易になります。
+
+### テスト
+
+```bash
+task test:api
+```
+
+主要 API フローを Supertest + Vitest で検証する統合テストです。ホスト側で直接実行する場合は、`DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app?sslmode=disable` をセットしてください。
+
+```bash
+task dev:detach    # 中で Vite/Express を起動
+pnpm exec playwright install --with-deps
+pnpm test:e2e
+```
+
+E2E テストは既存の `dev:detach` が起動済みである前提で実行してください（`task test:e2e` も利用可能ですが、初回起動は依存インストールの完了を待つため長くかかります）。
 
 ## 本番デプロイ（概要）
 

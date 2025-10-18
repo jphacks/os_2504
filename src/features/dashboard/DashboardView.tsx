@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import type { Member, RankingItem, Restaurant, RoomSummary, StepId } from '../../lib/types';
-import { buttonDanger, buttonMuted, buttonPrimary, buttonSecondary, panelClass } from '../../lib/ui';
+import { buttonMuted, buttonPrimary, buttonSecondary, panelClass } from '../../lib/ui';
+import { RestaurantCard } from './components/RestaurantCard';
+import { RestaurantDetailPanel } from './components/RestaurantDetailPanel';
+import { useRestaurantDetail } from './hooks/useRestaurantDetail';
 import { StepIndicator } from './StepIndicator';
 
 const DEFAULT_SETTINGS = {
@@ -24,6 +27,16 @@ export function DashboardView() {
   const [ranking, setRanking] = useState<RankingItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<{ tone: 'info' | 'success' | 'error'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const {
+    selectedPlaceId,
+    detail: selectedDetail,
+    reviews: selectedReviews,
+    isLoading: isDetailLoading,
+    error: detailError,
+    loadDetail,
+    reset,
+  } = useRestaurantDetail();
 
   const roomCode = room?.room_code ?? null;
 
@@ -51,7 +64,7 @@ export function DashboardView() {
             });
           }
         } catch {
-          // ignore
+          // ignore polling errors
         }
       }, 1500);
     }
@@ -88,9 +101,7 @@ export function DashboardView() {
   const refreshRoom = async () => {
     if (!roomCode) return;
     try {
-      const result = await api<{ ok: boolean; data: RoomSummary & { qr: { text: string } } }>(
-        `/api/rooms/${roomCode}`,
-      );
+      const result = await api<{ ok: boolean; data: RoomSummary & { qr: { text: string } } }>(`/api/rooms/${roomCode}`);
       if (result.ok) {
         setRoom({
           room_code: roomCode,
@@ -157,11 +168,11 @@ export function DashboardView() {
   const fetchRestaurants = async () => {
     if (!roomCode || !memberToken) return;
     try {
-      const result = await api<{ ok: boolean; data: { items: Restaurant[] } }>(
-        `/api/rooms/${roomCode}/restaurants`,
-        { headers: { Authorization: `Bearer ${memberToken}` } },
-      );
+      const result = await api<{ ok: boolean; data: { items: Restaurant[] } }>(`/api/rooms/${roomCode}/restaurants`, {
+        headers: { Authorization: `Bearer ${memberToken}` },
+      });
       if (result.ok) {
+        reset();
         setRestaurants(result.data.items);
         showMessage('info', '最新の候補カードを取得しました。');
       }
@@ -241,11 +252,7 @@ export function DashboardView() {
           <StepIndicator active={stepId} />
         </header>
 
-        {statusMessage && (
-          <div className={`notice notice--${statusMessage.tone}`}>
-            {statusMessage.text}
-          </div>
-        )}
+        {statusMessage && <div className={`notice notice--${statusMessage.tone}`}>{statusMessage.text}</div>}
 
         <div className="app__content">
           <div className="app__main-column">
@@ -349,7 +356,7 @@ export function DashboardView() {
                         placeholder="例: 田中 太郎"
                       />
                     </label>
-                    <button className={buttonMuted} onClick={handleAddMember} disabled={!memberName.trim()}>
+                      <button className={buttonMuted} onClick={handleAddMember} disabled={!memberName.trim()}>
                       追加
                     </button>
                   </div>
@@ -372,9 +379,7 @@ export function DashboardView() {
                     トークン発行
                   </button>
                   {memberToken && (
-                    <p className="info-box">
-                      メンバー用トークンを取得済みです。このブラウザで投票APIを利用できます。
-                    </p>
+                    <p className="info-box">メンバー用トークンを取得済みです。このブラウザで投票APIを利用できます。</p>
                   )}
                 </div>
               </section>
@@ -390,32 +395,13 @@ export function DashboardView() {
                 </div>
                 <div className="card-grid">
                   {restaurants.map((r) => (
-                    <article key={r.place_id} className="restaurant-card">
-                      <div>
-                        <h3>{r.name}</h3>
-                        <p>{r.summary_simple}</p>
-                      </div>
-                      {r.photo_urls[0] && (
-                        <img
-                          src={r.photo_urls[0]}
-                          alt={r.name}
-                          className="restaurant-card__image"
-                          loading="lazy"
-                        />
-                      )}
-                      <div className="restaurant-card__meta">
-                        <span>★ {r.rating.toFixed(1)}</span>
-                        <span>{r.user_ratings_total} 件</span>
-                      </div>
-                      <div className="restaurant-card__actions">
-                        <button className={buttonSecondary} onClick={() => sendVote(r.place_id, false)}>
-                          良くないね
-                        </button>
-                        <button className={buttonDanger} onClick={() => sendVote(r.place_id, true)}>
-                          いいね
-                        </button>
-                      </div>
-                    </article>
+                    <RestaurantCard
+                      key={r.place_id}
+                      restaurant={r}
+                      onLike={(placeId) => sendVote(placeId, true)}
+                      onDislike={(placeId) => sendVote(placeId, false)}
+                      onDetail={loadDetail}
+                    />
                   ))}
                   {restaurants.length === 0 && (
                     <p className="placeholder-box">
@@ -480,10 +466,7 @@ export function DashboardView() {
                     <dt>準備進捗</dt>
                     <dd>
                       <div className="progress-bar">
-                        <div
-                          className="progress-bar__fill"
-                          style={{ width: `${room.preparation.progress}%` }}
-                        />
+                        <div className="progress-bar__fill" style={{ width: `${room.preparation.progress}%` }} />
                       </div>
                       <p>
                         {room.preparation.preparedCount}/{room.preparation.expectedCount} 件の候補を準備中
@@ -522,13 +505,20 @@ export function DashboardView() {
                     </li>
                   ))}
                   {ranking.length === 0 && (
-                    <li className="placeholder-box">
-                      まだランキングがありません。投票が集まると自動で結果が表示されます。
-                    </li>
+                    <li className="placeholder-box">まだランキングがありません。投票が集まると自動で結果が表示されます。</li>
                   )}
                 </ol>
               </section>
             )}
+
+            <RestaurantDetailPanel
+              isOpen={Boolean(room && selectedPlaceId)}
+              isLoading={isDetailLoading}
+              error={detailError}
+              detail={selectedDetail}
+              reviews={selectedReviews}
+              onClose={reset}
+            />
           </div>
         </div>
       </div>
