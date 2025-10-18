@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderToString } from 'react-dom/server';
-import App from './App.js';
+import App from './app/App';
 
 describe('App', () => {
   it('renders MogFinder prototype heading', () => {
