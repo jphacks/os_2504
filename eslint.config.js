@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint';
 
 export default [
   {
-    ignores: ['dist/**', 'drizzle/**', '.vercel/**', 'node_modules/**', 'node_modules_backup_**']
+    ignores: ['dist/**', 'drizzle/**', '.vercel/**', 'node_modules/**', 'node_modules_backup_**', 'ui_docs/**']
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

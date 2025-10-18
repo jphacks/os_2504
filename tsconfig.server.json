@@ -11,5 +11,5 @@
     "sourceMap": false
   },
   "include": ["server/**/*.ts", "db/**/*.ts"],
-  "exclude": ["src", "dist", "node_modules"]
+  "exclude": ["src", "dist", "node_modules", "ui_docs"]
 }
