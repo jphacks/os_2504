@@ -1,0 +1,62 @@
+version: '3'
+
+vars:
+  COMPOSE_FILE: docker-compose.dev.yml
+
+tasks:
+  dev:
+    desc: コンテナ上でフロント・API・DBをまとめて起動
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} up --build
+
+  dev:detach:
+    desc: バックグラウンドで開発環境を起動
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} up --build -d
+
+  stop:
+    desc: 開発用コンテナを停止
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} down
+
+  clean:
+    desc: 停止と同時にボリュームも削除
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} down -v
+
+  logs:
+    desc: 開発コンテナのログをフォロー
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} logs -f
+
+  install:
+    desc: 依存関係のみ事前にインストール
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} run --rm app bash -lc "pnpm install --frozen-lockfile"
+
+  shell:
+    desc: appコンテナでシェルを開く
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} exec app bash
+
+  ci:
+    desc: CI相当 (lint/typecheck/test/build) を Docker 上で実行
+    cmds:
+      - defer: docker compose -f {{.COMPOSE_FILE}} down --remove-orphans
+      - docker compose -f {{.COMPOSE_FILE}} up -d db
+      - docker compose -f {{.COMPOSE_FILE}} run --rm app bash -lc "pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+
+  db:generate:
+    desc: drizzle-kit generate (コンテナ起動中に実行)
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} exec app pnpm db:generate
+
+  db:migrate:
+    desc: drizzle-kit migrate (コンテナ起動中に実行)
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} exec app pnpm db:migrate
+
+  db:studio:
+    desc: drizzle-kit studio を起動
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} exec app pnpm db:studio

@@ -1,0 +1,48 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/workspace
+      - pnpm-store:/root/.local/share/pnpm/store
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "1"
+      WATCHPACK_POLLING: "1"
+      HOST: 0.0.0.0
+    env_file:
+      - .env
+    ports:
+      - "5173:5173" # Vite
+      - "3000:3000" # vercel dev
+    depends_on:
+      db:
+        condition: service_healthy
+    command: bash -lc "pnpm install --frozen-lockfile && pnpm dev"
+    tty: true
+    stdin_open: true
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  adminer:
+    image: adminer:4
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+volumes:
+  pnpm-store:
+  pgdata:

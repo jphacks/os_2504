@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "types": ["node", "vite/client", "vitest"],
+    "baseUrl": ".",
+    "paths": {}
+  },
+  "include": ["src", "api", "db", "vite.config.ts", "vitest.config.ts"]
+}
