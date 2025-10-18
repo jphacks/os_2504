@@ -22,7 +22,7 @@ tasks:
   dev:detach:
     desc: バックグラウンドで開発環境を起動
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} up --build -d
+      - docker compose -f {{.COMPOSE_FILE}} up -d
 
   stop:
     desc: 開発用コンテナを停止
@@ -42,7 +42,7 @@ tasks:
   install:
     desc: 依存関係のみ事前にインストール
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} run --rm app bash -lc "pnpm install --frozen-lockfile"
+      - docker compose -f {{.COMPOSE_FILE}} run --rm app bash -lc "pnpm install --frozen-lockfile --yes"
 
   shell:
     desc: appコンテナでシェルを開く

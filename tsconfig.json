@@ -10,7 +10,7 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
-    "types": ["node", "vite/client", "vitest"],
+    "types": ["node", "vite/client", "vitest", "@testing-library/jest-dom"],
     "baseUrl": ".",
     "paths": {}
   },

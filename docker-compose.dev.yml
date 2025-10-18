@@ -6,6 +6,7 @@ services:
     volumes:
       - .:/workspace
       - pnpm-store:/root/.local/share/pnpm/store
+      - node_modules:/workspace/node_modules
     environment:
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: "1"
@@ -19,7 +20,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: bash -lc "pnpm install --frozen-lockfile && pnpm dev"
+    command: bash -lc "if [ ! -d node_modules ]; then pnpm install --frozen-lockfile --yes || pnpm install --yes; fi; pnpm dev"
     tty: true
     stdin_open: true
   db:
@@ -45,4 +46,5 @@ services:
       - db
 volumes:
   pnpm-store:
+  node_modules:
   pgdata:

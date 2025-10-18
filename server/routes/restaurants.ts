@@ -4,7 +4,6 @@ import { getRestaurantDetail, listRestaurantReviews } from '../store.js';
 
 const router = Router();
 
-// eslint-disable-next-line no-unused-vars
 type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 
 const asyncHandler = (handler: AsyncHandler): RequestHandler => {

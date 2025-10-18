@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
+import { z } from 'zod';
 import {
   addMember,
   createRoom,
@@ -20,7 +21,6 @@ import { signMemberToken, verifyMemberToken } from '../tokens.js';
 
 const router = Router();
 
-// eslint-disable-next-line no-unused-vars
 type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 
 const asyncHandler = (handler: AsyncHandler): RequestHandler => {
@@ -86,29 +86,67 @@ const authenticateMember: RequestHandler = asyncHandler(async (req, res, next) =
   next();
 });
 
+const settingsSchema = z
+  .object({
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    radius: z.number().positive().max(50).optional(),
+    min_price_level: z.number().int().min(0).max(4).optional(),
+    max_price_level: z.number().int().min(0).max(4).optional(),
+  })
+  .strict();
+
+const createRoomSchema = z.object({
+  room_name: z.string().trim().min(1, 'room_name required'),
+  settings: settingsSchema.partial().optional(),
+});
+
+const updateSettingsSchema = settingsSchema.partial().refine((data) => Object.keys(data).length > 0, {
+  message: 'at least one setting is required',
+});
+
+const createMemberSchema = z.object({
+  member_name: z.string().trim().min(1, 'member_name required'),
+});
+
+const likeSchema = z.object({
+  place_id: z.string().min(1, 'place_id required'),
+  is_liked: z.boolean({ invalid_type_error: 'is_liked must be boolean' }),
+});
+
+const likesQuerySchema = z.object({
+  member_id: z
+    .union([z.string(), z.array(z.string()).nonempty()])
+    .optional()
+    .transform((value) => (typeof value === 'string' ? [value] : value)),
+  place_id: z.string().optional(),
+  is_liked: z
+    .union([z.literal('true'), z.literal('false')])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true')),
+});
+
+function buildValidationError(err: z.ZodError) {
+  const details: Record<string, string> = {};
+  err.errors.forEach((issue) => {
+    const path = issue.path.join('.') || 'root';
+    details[path] = issue.message;
+  });
+  return { code: 'INVALID_REQUEST', message: 'Request validation failed', details };
+}
+
 router.post(
   '/',
   asyncHandler(async (req, res) => {
-    const roomName = typeof req.body?.room_name === 'string' ? req.body.room_name.trim() : '';
-    if (!roomName) {
-      res.status(400).json({ ok: false, error: { code: 'ROOM_NAME_REQUIRED', message: 'room_name required', details: {} } });
+    const parsed = createRoomSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, error: buildValidationError(parsed.error) });
       return;
     }
 
-    const settingsInput =
-      typeof req.body?.settings === 'object' && req.body.settings !== null ? req.body.settings : {};
-
     const room = await createRoom({
-      roomName,
-      settings: {
-        latitude: typeof settingsInput.latitude === 'number' ? settingsInput.latitude : undefined,
-        longitude: typeof settingsInput.longitude === 'number' ? settingsInput.longitude : undefined,
-        radius: typeof settingsInput.radius === 'number' ? settingsInput.radius : undefined,
-        min_price_level:
-          typeof settingsInput.min_price_level === 'number' ? settingsInput.min_price_level : undefined,
-        max_price_level:
-          typeof settingsInput.max_price_level === 'number' ? settingsInput.max_price_level : undefined,
-      },
+      roomName: parsed.data.room_name.trim(),
+      settings: parsed.data.settings ?? {},
     });
 
     res.status(201).json({ ok: true, data: serializeRoom(room) });
@@ -120,14 +158,13 @@ router.patch(
   findRoom,
   asyncHandler(async (req: Request, res: Response) => {
     const room = (req as RoomRequest).room!;
-    const partial = req.body ?? {};
-    const updated = await updateRoomSettings(room, {
-      latitude: typeof partial.latitude === 'number' ? partial.latitude : undefined,
-      longitude: typeof partial.longitude === 'number' ? partial.longitude : undefined,
-      radius: typeof partial.radius === 'number' ? partial.radius : undefined,
-      min_price_level: typeof partial.min_price_level === 'number' ? partial.min_price_level : undefined,
-      max_price_level: typeof partial.max_price_level === 'number' ? partial.max_price_level : undefined,
-    });
+    const parsed = updateSettingsSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, error: buildValidationError(parsed.error) });
+      return;
+    }
+
+    const updated = await updateRoomSettings(room, parsed.data);
 
     res.json({ ok: true, data: serializeRoom(updated) });
   }),
@@ -177,13 +214,13 @@ router.post(
   findRoom,
   asyncHandler(async (req: Request, res: Response) => {
     const room = (req as RoomRequest).room!;
-    const memberName = typeof req.body?.member_name === 'string' ? req.body.member_name.trim() : '';
-    if (!memberName) {
-      res.status(400).json({ ok: false, error: { code: 'MEMBER_NAME_REQUIRED', message: 'member_name required', details: {} } });
+    const parsed = createMemberSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, error: buildValidationError(parsed.error) });
       return;
     }
 
-    const member = await addMember(room.room.id, memberName);
+    const member = await addMember(room.room.id, parsed.data.member_name.trim());
     res.status(201).json({ ok: true, data: { member_id: member.id, member_name: member.memberName } });
   }),
 );
@@ -249,15 +286,14 @@ router.post(
       return;
     }
 
-    const placeId = typeof req.body?.place_id === 'string' ? req.body.place_id : '';
-    const isLiked = req.body?.is_liked === true;
-    if (!placeId) {
-      res.status(400).json({ ok: false, error: { code: 'PLACE_ID_REQUIRED', message: 'place_id required', details: {} } });
+    const parsed = likeSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, error: buildValidationError(parsed.error) });
       return;
     }
 
     const restaurants = await ensureRestaurantsPrepared(room.room.id);
-    const placeKnown = restaurants.some((restaurant) => restaurant.place_id === placeId);
+    const placeKnown = restaurants.some((restaurant) => restaurant.place_id === parsed.data.place_id);
     if (!placeKnown) {
       res.status(404).json({ ok: false, error: { code: 'PLACE_NOT_FOUND', message: 'Restaurant not found', details: {} } });
       return;
@@ -266,8 +302,8 @@ router.post(
     const like = await recordLike({
       roomId: room.room.id,
       memberId: memberReq.memberId!,
-      placeId,
-      isLiked,
+      placeId: parsed.data.place_id,
+      isLiked: parsed.data.is_liked,
     });
 
     res.json({
@@ -309,13 +345,13 @@ router.get(
     const memberReq = req as MemberAwareRequest;
     const room = memberReq.room!;
 
-    const membersFilter = Array.isArray(req.query.member_id)
-      ? (req.query.member_id as string[])
-      : typeof req.query.member_id === 'string'
-        ? [req.query.member_id]
-        : undefined;
-    const placeFilter = typeof req.query.place_id === 'string' ? req.query.place_id : undefined;
-    const likedFilter = typeof req.query.is_liked === 'string' ? req.query.is_liked === 'true' : undefined;
+    const parsedQuery = likesQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      res.status(400).json({ ok: false, error: buildValidationError(parsedQuery.error) });
+      return;
+    }
+
+    const { member_id: membersFilter, place_id: placeFilter, is_liked: likedFilter } = parsedQuery.data;
 
     const likesList = await listLikes({
       roomId: room.room.id,
