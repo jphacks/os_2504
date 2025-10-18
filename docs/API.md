@@ -321,12 +321,14 @@
         "place_id": "ChIJ...",
         "name": "トリキン",
         "address": "千代田区...",
+        "summary_simple": "焼き鳥が人気・0.3km",
         "phone_number": "03-....",
         "website": "https://...",
         "google_maps_url": "https://maps.google.com/?cid=...",
         "opening_hours": { "weekday_text": ["Mon: 17:00-23:00", "..."] },
         "summary_detail": "安価で飲める焼き鳥居酒屋...",
-        "photo_urls": ["https://.../p1.jpg","https://.../p2.jpg"]
+        "photo_urls": ["https://.../p1.jpg","https://.../p2.jpg"],
+        "types": ["izakaya", "japanese"]
       }
     }
     ```
@@ -341,10 +343,18 @@
     {
       "ok": true,
       "data": [
-        { "author_name": "Taro", "rating": 5, "text": "串が美味", "time": "2025-10-01T12:00:00Z" }
+        {
+          "id": "c8f4...",
+          "author_name": "Taro",
+          "rating": 5,
+          "text": "串が美味",
+          "time": "2025-10-01T12:00:00Z"
+        }
       ]
     }
     ```
+
+> 開発環境では `task db:seed` を実行すると、疑似的な飲食店データとレビューが投入され、上記エンドポイントのレスポンスをすぐに確認できます。
     
 
 ---
