@@ -14,5 +14,6 @@
     "baseUrl": ".",
     "paths": {}
   },
-  "include": ["src", "server", "db", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "server", "db", "vite.config.ts", "vitest.config.ts"],
+  "exclude": ["ui_docs"]
 }
