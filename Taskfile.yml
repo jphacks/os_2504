@@ -5,7 +5,7 @@ vars:
 
 tasks:
   dev:
-    desc: コンテナ上でフロント・API・DBをまとめて起動
+    desc: コンテナ上でフロント・API(Express)・DBをまとめて起動
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} up --build
 
@@ -45,6 +45,42 @@ tasks:
       - defer: docker compose -f {{.COMPOSE_FILE}} down --remove-orphans
       - docker compose -f {{.COMPOSE_FILE}} up -d db
       - docker compose -f {{.COMPOSE_FILE}} run --rm app bash -lc "pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+
+  prod:test:
+    desc: 本番ビルドを生成しローカル環境でヘルスチェック
+    cmds:
+      - |
+        bash -lc '
+          set -euo pipefail
+          export PORT="${PORT:-8080}"
+          export DATABASE_URL="${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/app?sslmode=disable}"
+
+          pnpm build
+
+          node dist/server/index.js &
+          pid=$!
+          trap "kill $pid >/dev/null 2>&1 || true" EXIT
+
+          success=false
+          for _ in $(seq 1 20); do
+            if curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null; then
+              success=true
+              break
+            fi
+            sleep 1
+          done
+
+          kill $pid >/dev/null 2>&1 || true
+          wait $pid >/dev/null 2>&1 || true
+
+          if [ "${success}" = true ]; then
+            echo "Health check OK (http://127.0.0.1:${PORT}/api/health)"
+            exit 0
+          fi
+
+          echo "Health check failed" >&2
+          exit 1
+        '
 
   db:generate:
     desc: drizzle-kit generate (コンテナ起動中に実行)

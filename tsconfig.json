@@ -4,6 +4,8 @@
     "lib": ["ES2022", "DOM"],
     "module": "ESNext",
     "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -12,5 +14,5 @@
     "baseUrl": ".",
     "paths": {}
   },
-  "include": ["src", "api", "db", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "server", "db", "vite.config.ts", "vitest.config.ts"]
 }

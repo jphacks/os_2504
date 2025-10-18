@@ -1,36 +1,48 @@
-# サンプル（プロダクト名）
+# Fullstack Starter (Vite × Cloud Run × Cloud SQL)
 
-[![IMAGE ALT TEXT HERE](https://jphacks.com/wp-content/uploads/2025/05/JPHACKS2025_ogp.jpg)](https://www.youtube.com/watch?v=lA9EluZugD8)
+シンプルな ToDo アプリで、下記のスタックを利用したフルスタック開発／本番運用フローを検証できます。
 
-## 製品概要
-### 背景(製品開発のきっかけ、課題等）
-### 製品説明（具体的な製品の説明）
-### 特長
-#### 1. 特長1
-#### 2. 特長2
-#### 3. 特長3
+- フロントエンド: Vite + React 19 + Tailwind CSS v4
+- バックエンド: Express (TypeScript) を Cloud Run 上で稼働
+- データベース: PostgreSQL（ローカル Docker / 本番 Cloud SQL）
+- ORM: Drizzle ORM
+- CI/CD: GitHub Actions → Artifact Registry → Cloud Run
 
-### 解決出来ること
-### 今後の展望
-### 注力したこと（こだわり等）
-* 
-* 
+## ローカル開発
 
-## 開発技術
-### 活用した技術
-#### API・データ
-* 
-* 
+```bash
+cp .env.example .env
+task dev
+```
 
-#### フレームワーク・ライブラリ・モジュール
-* 
-* 
+- Web: http://localhost:5173
+- API: http://localhost:3000/api/health
+- DB GUI: http://localhost:8080 (Adminer)
 
-#### デバイス
-* 
-* 
+`task dev`（= Docker Compose）で Vite・Express・PostgreSQL をまとめて起動します。`.env` の `DATABASE_URL` は Docker 内の Postgres を指すようにしてください。
 
-### 独自技術
-#### ハッカソンで開発した独自機能・技術
-* 独自で開発したものの内容をこちらに記載してください
-* 特に力を入れた部分をファイルリンク、またはcommit_idを記載してください。
+## 本番デプロイ（概要）
+
+1. Cloud SQL for PostgreSQL を作成し、接続ユーザーを準備。
+2. Artifact Registry にリポジトリ（例: `fullstack`）を作成。
+3. Cloud Run サービス用のサービスアカウントを作成し、`run.admin` / `iam.serviceAccountUser` / `artifactregistry.writer` / `cloudsql.client` など必要ロールを付与。
+4. GitHub Secrets に以下を設定。
+   - `GCP_PROJECT_ID`, `GCP_REGION`, `CLOUD_RUN_SERVICE`, `ARTIFACT_REPOSITORY`
+   - `GCP_SERVICE_ACCOUNT_KEY`（手順3の JSON キー）
+   - `DATABASE_URL`, `DB_SSL`, `DB_SSL_STRICT`, `DB_MAX_CONNECTIONS`
+   - `CLOUD_SQL_CONNECTION`（Cloud SQL Auth Proxy/Connector を使う場合。不要なら空文字）
+5. `main` にマージすると GitHub Actions が Docker ビルド → Artifact Registry push → Cloud Run デプロイを実行します。
+
+詳細なセットアップ手順は `docs/Tutorial.md` を参照してください。
+
+## スクリプト
+
+- `pnpm dev` : Vite + Express サーバーを同時起動
+- `pnpm build` : フロント（`dist/client`）とサーバー（`dist/server`）をビルド
+- `pnpm start` : ビルド済み成果物を起動（Cloud Run と同等）
+- `pnpm db:*` : Drizzle ORM 用のユーティリティ
+- `task prod:test` : 本番ビルドを生成し、ローカルポート8080でヘルスチェック
+
+## ライセンス
+
+MIT

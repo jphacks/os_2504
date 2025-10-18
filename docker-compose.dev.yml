@@ -15,7 +15,7 @@ services:
       - .env
     ports:
       - "5173:5173" # Vite
-      - "3000:3000" # vercel dev
+      - "3000:3000" # API server (Express)
     depends_on:
       db:
         condition: service_healthy

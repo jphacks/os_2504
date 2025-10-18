@@ -25,7 +25,7 @@ export default function App() {
     <main className="mx-auto max-w-2xl p-6 space-y-6">
       <header className="space-y-2">
         <h1 className="text-2xl font-bold">Fullstack Starter</h1>
-        <p className="text-sm text-gray-400">Vite + React 19 + Tailwind v4 + Vercel Functions + Drizzle (PostgreSQL)</p>
+        <p className="text-sm text-gray-400">Vite + React 19 + Tailwind v4 + Cloud Run API + Drizzle (PostgreSQL)</p>
       </header>
 
       <section className="rounded-2xl border border-gray-800 p-4">
