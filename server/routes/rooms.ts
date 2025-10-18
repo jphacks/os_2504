@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
+import { z } from 'zod';
 import {
   addMember,
   createRoom,
+  ensureRestaurantsPrepared,
   getMember,
   getRanking,
   getRoomByCode,
@@ -12,294 +14,400 @@ import {
   resetLikes,
   serializeRoom,
   updateRoomSettings,
-  ensureRestaurantsPrepared,
-  type Room,
+  type LikeView,
+  type RoomWithSettings,
 } from '../store.js';
 import { signMemberToken, verifyMemberToken } from '../tokens.js';
 
 const router = Router();
 
+type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
+
+const asyncHandler = (handler: AsyncHandler): RequestHandler => {
+  return (req, res, next) => {
+    Promise.resolve(handler(req, res, next)).catch(next);
+  };
+};
+
 interface RoomRequest extends Request {
-  room?: Room;
+  room?: RoomWithSettings;
 }
 
-function findRoom(req: RoomRequest, res: Response, next: NextFunction) {
-  const { room_code: roomCode } = req.params;
+const findRoom = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const roomReq = req as RoomRequest;
+  const roomCode = typeof req.params.room_code === 'string' ? req.params.room_code : '';
   if (!roomCode) {
     res.status(400).json({ ok: false, error: { code: 'ROOM_CODE_REQUIRED', message: 'room_code required', details: {} } });
     return;
   }
-  const room = getRoomByCode(roomCode);
+  const room = await getRoomByCode(roomCode);
   if (!room) {
     res.status(404).json({ ok: false, error: { code: 'ROOM_NOT_FOUND', message: 'Room not found', details: {} } });
     return;
   }
-  req.room = room;
+  roomReq.room = room;
   next();
-}
+});
 
 type MemberAwareRequest = RoomRequest & { memberId?: string };
 
-const authenticateMember: RequestHandler = (req, res, next) => {
+const authenticateMember: RequestHandler = asyncHandler(async (req, res, next) => {
   const roomReq = req as MemberAwareRequest;
   const auth = req.get('authorization');
   if (!auth || !auth.startsWith('Bearer ')) {
     res.status(401).json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Authorization header required', details: {} } });
     return;
   }
+
   const token = auth.slice('Bearer '.length);
   const verified = verifyMemberToken(token);
   if (!verified) {
     res.status(401).json({ ok: false, error: { code: 'INVALID_TOKEN', message: 'Invalid member token', details: {} } });
     return;
   }
+
   if (!roomReq.room) {
     res.status(500).json({ ok: false, error: { code: 'ROOM_NOT_LOADED', message: 'Room missing in request context', details: {} } });
     return;
   }
-  if (roomReq.room.roomId !== verified.roomId) {
+
+  if (roomReq.room.room.id !== verified.roomId) {
     res.status(403).json({ ok: false, error: { code: 'ROOM_MISMATCH', message: 'Token does not belong to this room', details: {} } });
     return;
   }
-  const member = getMember(roomReq.room, verified.memberId);
+
+  const member = await getMember(roomReq.room.room.id, verified.memberId);
   if (!member) {
     res.status(403).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found in room', details: {} } });
     return;
   }
-  roomReq.memberId = member.memberId;
+
+  roomReq.memberId = member.id;
   next();
-};
+});
 
-router.post('/', (req, res) => {
-  const roomName = typeof req.body?.room_name === 'string' ? req.body.room_name.trim() : '';
-  if (!roomName) {
-    res.status(400).json({ ok: false, error: { code: 'ROOM_NAME_REQUIRED', message: 'room_name required', details: {} } });
-    return;
-  }
+const settingsSchema = z
+  .object({
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    radius: z.number().positive().max(50).optional(),
+    min_price_level: z.number().int().min(0).max(4).optional(),
+    max_price_level: z.number().int().min(0).max(4).optional(),
+  })
+  .strict();
 
-  const settingsInput =
-    typeof req.body?.settings === 'object' && req.body.settings !== null ? req.body.settings : {};
-  const room = createRoom({
-    roomName,
-    settings: {
-      latitude: typeof settingsInput.latitude === 'number' ? settingsInput.latitude : undefined,
-      longitude: typeof settingsInput.longitude === 'number' ? settingsInput.longitude : undefined,
-      radius: typeof settingsInput.radius === 'number' ? settingsInput.radius : undefined,
-      min_price_level: typeof settingsInput.min_price_level === 'number' ? settingsInput.min_price_level : undefined,
-      max_price_level: typeof settingsInput.max_price_level === 'number' ? settingsInput.max_price_level : undefined,
-    },
+const createRoomSchema = z.object({
+  room_name: z.string().trim().min(1, 'room_name required'),
+  settings: settingsSchema.partial().optional(),
+});
+
+const updateSettingsSchema = settingsSchema.partial().refine((data) => Object.keys(data).length > 0, {
+  message: 'at least one setting is required',
+});
+
+const createMemberSchema = z.object({
+  member_name: z.string().trim().min(1, 'member_name required'),
+});
+
+const likeSchema = z.object({
+  place_id: z.string().min(1, 'place_id required'),
+  is_liked: z.boolean({ invalid_type_error: 'is_liked must be boolean' }),
+});
+
+const likesQuerySchema = z.object({
+  member_id: z
+    .union([z.string(), z.array(z.string()).nonempty()])
+    .optional()
+    .transform((value) => (typeof value === 'string' ? [value] : value)),
+  place_id: z.string().optional(),
+  is_liked: z
+    .union([z.literal('true'), z.literal('false')])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true')),
+});
+
+function buildValidationError(err: z.ZodError) {
+  const details: Record<string, string> = {};
+  err.errors.forEach((issue) => {
+    const path = issue.path.join('.') || 'root';
+    details[path] = issue.message;
   });
+  return { code: 'INVALID_REQUEST', message: 'Request validation failed', details };
+}
 
-  res.status(201).json({ ok: true, data: serializeRoom(room) });
-});
+router.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const parsed = createRoomSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, error: buildValidationError(parsed.error) });
+      return;
+    }
 
-router.patch('/:room_code/settings', findRoom, (req: RoomRequest, res: Response) => {
-  const partial = req.body ?? {};
-  const room = req.room!;
-  const updated = updateRoomSettings(room, {
-    latitude: typeof partial.latitude === 'number' ? partial.latitude : undefined,
-    longitude: typeof partial.longitude === 'number' ? partial.longitude : undefined,
-    radius: typeof partial.radius === 'number' ? partial.radius : undefined,
-    min_price_level: typeof partial.min_price_level === 'number' ? partial.min_price_level : undefined,
-    max_price_level: typeof partial.max_price_level === 'number' ? partial.max_price_level : undefined,
-  });
+    const room = await createRoom({
+      roomName: parsed.data.room_name.trim(),
+      settings: parsed.data.settings ?? {},
+    });
 
-  res.json({ ok: true, data: serializeRoom(updated) });
-});
+    res.status(201).json({ ok: true, data: serializeRoom(room) });
+  }),
+);
 
-router.get('/:room_code', findRoom, (req: RoomRequest, res: Response) => {
-  const room = req.room!;
-  res.json({
-    ok: true,
-    data: {
-      room_name: room.roomName,
-      status: room.status,
-      share_url: room.shareUrl,
-      qr: { text: room.shareUrl },
-      preparation: room.preparation,
-    },
-  });
-});
+router.patch(
+  '/:room_code/settings',
+  findRoom,
+  asyncHandler(async (req: Request, res: Response) => {
+    const room = (req as RoomRequest).room!;
+    const parsed = updateSettingsSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, error: buildValidationError(parsed.error) });
+      return;
+    }
 
-router.get('/:room_code/members', findRoom, (req: RoomRequest, res: Response) => {
-  const room = req.room!;
-  res.json({
-    ok: true,
-    data: listMembers(room).map((member) => ({
-      member_id: member.memberId,
-      member_name: member.memberName,
-    })),
-  });
-});
+    const updated = await updateRoomSettings(room, parsed.data);
 
-router.post('/:room_code/members', findRoom, (req: RoomRequest, res: Response) => {
-  const room = req.room!;
-  const memberName = typeof req.body?.member_name === 'string' ? req.body.member_name.trim() : '';
-  if (!memberName) {
-    res.status(400).json({ ok: false, error: { code: 'MEMBER_NAME_REQUIRED', message: 'member_name required', details: {} } });
-    return;
-  }
-  const member = addMember(room, memberName);
-  res.status(201).json({ ok: true, data: { member_id: member.memberId, member_name: member.memberName } });
-});
+    res.json({ ok: true, data: serializeRoom(updated) });
+  }),
+);
+
+router.get(
+  '/:room_code',
+  findRoom,
+  (req: Request, res: Response) => {
+    const room = (req as RoomRequest).room!;
+    res.json({
+      ok: true,
+      data: {
+        room_name: room.room.roomName,
+        status: room.room.status,
+        share_url: room.room.roomUrl,
+        qr: { text: room.room.roomUrl },
+        preparation: {
+          started: room.room.prepStarted,
+          progress: room.room.prepProgress,
+          preparedCount: room.room.prepPreparedCount,
+          expectedCount: room.room.prepExpectedCount,
+        },
+      },
+    });
+  },
+);
+
+router.get(
+  '/:room_code/members',
+  findRoom,
+  asyncHandler(async (req: Request, res: Response) => {
+    const room = (req as RoomRequest).room!;
+    const membersList = await listMembers(room.room.id);
+    res.json({
+      ok: true,
+      data: membersList.map((member) => ({
+        member_id: member.id,
+        member_name: member.memberName,
+      })),
+    });
+  }),
+);
+
+router.post(
+  '/:room_code/members',
+  findRoom,
+  asyncHandler(async (req: Request, res: Response) => {
+    const room = (req as RoomRequest).room!;
+    const parsed = createMemberSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, error: buildValidationError(parsed.error) });
+      return;
+    }
+
+    const member = await addMember(room.room.id, parsed.data.member_name.trim());
+    res.status(201).json({ ok: true, data: { member_id: member.id, member_name: member.memberName } });
+  }),
+);
 
 router.post(
   '/:room_code/members/:member_id/session',
   findRoom,
-  (req: RoomRequest, res: Response) => {
-  const room = req.room!;
-  const memberId = typeof req.params.member_id === 'string' ? req.params.member_id : '';
-  if (!memberId) {
-    res.status(400).json({ ok: false, error: { code: 'MEMBER_ID_REQUIRED', message: 'member_id required', details: {} } });
-    return;
-  }
-  const member = getMember(room, memberId);
-  if (!member) {
-    res.status(404).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found', details: {} } });
-    return;
-  }
+  asyncHandler(async (req: Request, res: Response) => {
+    const room = (req as RoomRequest).room!;
+    const memberId = typeof req.params.member_id === 'string' ? req.params.member_id : '';
+    if (!memberId) {
+      res.status(400).json({ ok: false, error: { code: 'MEMBER_ID_REQUIRED', message: 'member_id required', details: {} } });
+      return;
+    }
+    const member = await getMember(room.room.id, memberId);
+    if (!member) {
+      res.status(404).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found', details: {} } });
+      return;
+    }
 
-  const signed = signMemberToken(room.roomId, member.memberId);
-  res.json({
-    ok: true,
-    data: {
-      member_token: signed.token,
-      expires_in: signed.expiresIn,
-      member: { member_id: member.memberId, member_name: member.memberName },
-    },
-  });
-  },
+    const signed = signMemberToken(room.room.id, member.id);
+    res.json({
+      ok: true,
+      data: {
+        member_token: signed.token,
+        expires_in: signed.expiresIn,
+        member: { member_id: member.id, member_name: member.memberName },
+      },
+    });
+  }),
 );
 
-router.get('/:room_code/restaurants', findRoom, (req: RoomRequest, res: Response) => {
-  const room = req.room!;
-  if (room.status !== 'voting') {
-    res.status(425).json({ ok: false, error: { code: 'ROOM_NOT_READY', message: 'Restaurant data is not ready yet.', details: {} } });
-    return;
-  }
-  const items = ensureRestaurantsPrepared(room);
-  res.json({
-    ok: true,
-    data: {
-      items,
-      next_cursor: null,
-    },
-  });
-});
+router.get(
+  '/:room_code/restaurants',
+  findRoom,
+  asyncHandler(async (req: Request, res: Response) => {
+    const room = (req as RoomRequest).room!;
+    if (room.room.status !== 'voting') {
+      res.status(425).json({ ok: false, error: { code: 'ROOM_NOT_READY', message: 'Restaurant data is not ready yet.', details: {} } });
+      return;
+    }
+
+    const items = await ensureRestaurantsPrepared(room.room.id);
+    res.json({
+      ok: true,
+      data: {
+        items,
+        next_cursor: null,
+      },
+    });
+  }),
+);
 
 router.post(
   '/:room_code/likes',
   findRoom,
   authenticateMember,
-  (req: Request, res: Response) => {
-  const memberReq = req as MemberAwareRequest & { memberId: string };
-  const room = memberReq.room!;
-  if (room.status !== 'voting') {
-    res.status(409).json({ ok: false, error: { code: 'ROOM_NOT_IN_VOTING', message: 'Voting is not available right now.', details: {} } });
-    return;
-  }
-  const placeId = typeof req.body?.place_id === 'string' ? req.body.place_id : '';
-  const isLiked = req.body?.is_liked === true;
-  if (!placeId) {
-    res.status(400).json({ ok: false, error: { code: 'PLACE_ID_REQUIRED', message: 'place_id required', details: {} } });
-    return;
-  }
-  ensureRestaurantsPrepared(room);
-  if (!room.restaurants.has(placeId)) {
-    res.status(404).json({ ok: false, error: { code: 'PLACE_NOT_FOUND', message: 'Restaurant not found', details: {} } });
-    return;
-  }
-  const memberId = memberReq.memberId;
-  if (!memberId) {
-    res.status(500).json({ ok: false, error: { code: 'MEMBER_NOT_LOADED', message: 'Member missing in request context', details: {} } });
-    return;
-  }
-  const like = recordLike({ room, memberId, placeId, isLiked });
-  res.json({
-    ok: true,
-    data: {
-      member_id: like.memberId,
-      place_id: like.placeId,
-      is_liked: like.isLiked,
-      updated_at: like.updatedAt.toISOString(),
-    },
-  });
-  },
+  asyncHandler(async (req: Request, res: Response) => {
+    const memberReq = req as MemberAwareRequest & { memberId: string };
+    const room = memberReq.room!;
+    if (room.room.status !== 'voting') {
+      res.status(409).json({ ok: false, error: { code: 'ROOM_NOT_IN_VOTING', message: 'Voting is not available right now.', details: {} } });
+      return;
+    }
+
+    const parsed = likeSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, error: buildValidationError(parsed.error) });
+      return;
+    }
+
+    const restaurants = await ensureRestaurantsPrepared(room.room.id);
+    const placeKnown = restaurants.some((restaurant) => restaurant.place_id === parsed.data.place_id);
+    if (!placeKnown) {
+      res.status(404).json({ ok: false, error: { code: 'PLACE_NOT_FOUND', message: 'Restaurant not found', details: {} } });
+      return;
+    }
+
+    const like = await recordLike({
+      roomId: room.room.id,
+      memberId: memberReq.memberId!,
+      placeId: parsed.data.place_id,
+      isLiked: parsed.data.is_liked,
+    });
+
+    res.json({
+      ok: true,
+      data: {
+        member_id: like.memberId,
+        place_id: like.placeId,
+        is_liked: like.isLiked,
+        updated_at: like.updatedAt.toISOString(),
+      },
+    });
+  }),
 );
+
+function buildLikeResponse(
+  likesList: LikeView[],
+  memberNames: Map<string, string>,
+  restaurantNames: Map<string, string>,
+) {
+  return likesList.map((like) => ({
+    member: {
+      member_id: like.memberId,
+      member_name: memberNames.get(like.memberId) ?? 'unknown',
+    },
+    place: {
+      place_id: like.placeId,
+      name: restaurantNames.get(like.placeId) ?? 'unknown',
+    },
+    is_liked: like.isLiked,
+    updated_at: like.updatedAt.toISOString(),
+  }));
+}
 
 router.get(
   '/:room_code/likes',
   findRoom,
   authenticateMember,
-  (req: Request, res: Response) => {
-  const memberReq = req as MemberAwareRequest;
-  const room = memberReq.room!;
-  const members = Array.isArray(req.query.member_id)
-    ? (req.query.member_id as string[])
-    : typeof req.query.member_id === 'string'
-      ? [req.query.member_id]
-      : undefined;
-  const placeId = typeof req.query.place_id === 'string' ? req.query.place_id : undefined;
-  const isLiked =
-    typeof req.query.is_liked === 'string'
-      ? req.query.is_liked === 'true'
-      : undefined;
-  const items = listLikes({ room, memberIds: members, placeId, isLiked }).map((like) => ({
-    member: {
-      member_id: like.memberId,
-      member_name: getMember(room, like.memberId)?.memberName ?? 'unknown',
-    },
-    place: {
-      place_id: like.placeId,
-      name: room.restaurants.get(like.placeId)?.name ?? 'unknown',
-    },
-    is_liked: like.isLiked,
-    updated_at: like.updatedAt.toISOString(),
-  }));
+  asyncHandler(async (req: Request, res: Response) => {
+    const memberReq = req as MemberAwareRequest;
+    const room = memberReq.room!;
 
-  res.json({ ok: true, data: { items, next_cursor: null } });
-  },
+    const parsedQuery = likesQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      res.status(400).json({ ok: false, error: buildValidationError(parsedQuery.error) });
+      return;
+    }
+
+    const { member_id: membersFilter, place_id: placeFilter, is_liked: likedFilter } = parsedQuery.data;
+
+    const likesList = await listLikes({
+      roomId: room.room.id,
+      memberIds: membersFilter,
+      placeId: placeFilter,
+      isLiked: likedFilter,
+    });
+
+    const [membersList, restaurants] = await Promise.all([
+      listMembers(room.room.id),
+      ensureRestaurantsPrepared(room.room.id),
+    ]);
+
+    const memberNames = new Map(membersList.map((member) => [member.id, member.memberName]));
+    const restaurantNames = new Map(restaurants.map((restaurant) => [restaurant.place_id, restaurant.name]));
+
+    res.json({ ok: true, data: { items: buildLikeResponse(likesList, memberNames, restaurantNames), next_cursor: null } });
+  }),
 );
 
 router.delete(
   '/:room_code/likes/:member_id',
   findRoom,
   authenticateMember,
-  (req: Request, res: Response) => {
-  const memberReq = req as MemberAwareRequest;
-  const room = memberReq.room!;
-  if (room.status !== 'voting') {
-    res.status(409).json({ ok: false, error: { code: 'ROOM_NOT_IN_VOTING', message: 'Voting is not available right now.', details: {} } });
-    return;
-  }
-  const targetMemberId = typeof req.params.member_id === 'string' ? req.params.member_id : '';
-  if (!targetMemberId) {
-    res.status(400).json({ ok: false, error: { code: 'MEMBER_ID_REQUIRED', message: 'member_id required', details: {} } });
-    return;
-  }
-  if (!getMember(room, targetMemberId)) {
-    res.status(404).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found', details: {} } });
-    return;
-  }
-  const deletedCount = resetLikes(room, targetMemberId);
-  res.json({ ok: true, data: { reset: true, deleted_count: deletedCount } });
-  },
+  asyncHandler(async (req: Request, res: Response) => {
+    const room = (req as MemberAwareRequest).room!;
+    if (room.room.status !== 'voting') {
+      res.status(409).json({ ok: false, error: { code: 'ROOM_NOT_IN_VOTING', message: 'Voting is not available right now.', details: {} } });
+      return;
+    }
+
+    const targetMemberId = typeof req.params.member_id === 'string' ? req.params.member_id : '';
+    if (!targetMemberId) {
+      res.status(400).json({ ok: false, error: { code: 'MEMBER_ID_REQUIRED', message: 'member_id required', details: {} } });
+      return;
+    }
+
+    const member = await getMember(room.room.id, targetMemberId);
+    if (!member) {
+      res.status(404).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found', details: {} } });
+      return;
+    }
+
+    const deletedCount = await resetLikes(room.room.id, targetMemberId);
+    res.json({ ok: true, data: { reset: true, deleted_count: deletedCount } });
+  }),
 );
 
-router.get('/:room_code/ranking', findRoom, (req: RoomRequest, res: Response) => {
-  const room = req.room!;
-  const ranking = getRanking(room).map((item) => ({
-    rank: item.rank,
-    place_id: item.place_id,
-    name: item.name,
-    score: item.score,
-    like_count: item.like_count,
-    dislike_count: item.dislike_count,
-    rating: item.rating,
-    user_ratings_total: item.user_ratings_total,
-    google_maps_url: item.google_maps_url,
-  }));
-  res.json({ ok: true, data: ranking });
-});
+router.get(
+  '/:room_code/ranking',
+  findRoom,
+  asyncHandler(async (req: Request, res: Response) => {
+    const room = (req as RoomRequest).room!;
+    const ranking = await getRanking(room.room.id);
+    res.json({ ok: true, data: ranking });
+  }),
+);
 
 export default router;

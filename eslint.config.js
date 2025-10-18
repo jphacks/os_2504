@@ -4,13 +4,14 @@ import tseslint from 'typescript-eslint';
 
 export default [
   {
-    ignores: ['dist/**', 'drizzle/**', '.vercel/**', 'node_modules/**', 'ui_docs/**']
+    ignores: ['dist/**', 'drizzle/**', '.vercel/**', 'node_modules/**', 'node_modules_backup_**', 'ui_docs/**']
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
     rules: {
-      'no-unused-vars': 'warn'
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }]
     }
   }
 ];
