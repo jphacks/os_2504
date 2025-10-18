@@ -91,6 +91,27 @@ gcloud run deploy <CLOUD_RUN_SERVICE> \
 
 Cloud SQL の Private IP を使う場合は `--vpc-connector` でServerless VPC Access Connector を指定し、Public IP を使う場合は Cloud SQL Auth Proxy（`--add-cloudsql-instances`）を設定してください。
 
+### GitHub Actions による自動デプロイ
+
+main ブランチへ push されたときに GitHub Actions がビルドと Cloud Run デプロイを実行します（`.github/workflows/ci.yml`）。以下の Secrets / Variables をリポジトリに登録してください。
+
+| 名前 | 必須 | 説明 |
+| ---- | ---- | ---- |
+| `GCP_SERVICE_ACCOUNT_KEY` | ✅ | `cloud-run-sa` などデプロイ権限を持つサービスアカウントの JSON キー |
+| `GCP_PROJECT_ID` | ✅ | 例: `mogufinder` |
+| `GCP_REGION` | ✅ | 例: `asia-northeast2` |
+| `CLOUD_RUN_SERVICE` | ✅ | 例: `mogufinder-api` |
+| `ARTIFACT_REPOSITORY` | ✅ | Artifact Registry のリポジトリ名（例: `mogu-finder-image`） |
+| `CLOUD_SQL_CONNECTION` | ✅ | 例: `mogufinder:asia-northeast2:mogufinder-db` |
+| `DATABASE_URL` | 任意 | 直接接続する場合の接続文字列。Cloud SQL Proxy を使う場合は空でも可 |
+| `DB_USER` / `DB_NAME` / `DB_HOST` / `DB_SSL` / `DB_SSL_STRICT` / `DB_MAX_CONNECTIONS` | 任意 | 未設定時はスクリプト側のデフォルトを利用 |
+| `DB_PASSWORD_SECRET` | 任意 | Secret Manager の指定 (`secret-name:latest`) を `gcloud run deploy --set-secrets` に付与 |
+| `CLOUD_RUN_IMAGE_NAME` | 任意 | イメージ名を変えたい場合（デフォルトは `mogufinder-apiatest`） |
+| `CLOUD_RUN_SERVICE_ACCOUNT` | 任意 | Cloud Run 実行時に使うサービスアカウント。未指定なら `cloud-run-sa@<PROJECT_ID>.iam.gserviceaccount.com` |
+| `VPC_CONNECTOR` / `VPC_EGRESS` | 任意 | Serverless VPC Access を利用する場合に指定 |
+
+Workflow 内では `scripts/build-and-push.sh` と `scripts/deploy-cloud-run.sh` を呼び出しています。ローカルでも同じスクリプトを使えば手作業と CI/CD の整合性を保てます。
+
 ## Notes
 - Node は 22 LTS 固定（10/21/2025 までは現行 LTS）。Node 24 LTS 昇格後に上げる場合は `engines` と CI の node-version を更新してください。
 - Tailwind v4 はゼロコンフィグ。必要があれば `tailwind.config.ts` を追加可能です。
