@@ -20,7 +20,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: bash -lc "if [ ! -d node_modules ]; then pnpm install --frozen-lockfile --yes || pnpm install --yes; fi; pnpm dev"
+    command: bash -lc "if [ ! -d node_modules ]; then PNPM_YES=true pnpm install --frozen-lockfile || PNPM_YES=true pnpm install; fi; pnpm dev"
     tty: true
     stdin_open: true
   db:

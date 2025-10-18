@@ -42,7 +42,7 @@ tasks:
   install:
     desc: 依存関係のみ事前にインストール
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} run --rm app bash -lc "pnpm install --frozen-lockfile --yes"
+      - docker compose -f {{.COMPOSE_FILE}} run --rm app bash -lc "PNPM_YES=true pnpm install --frozen-lockfile"
 
   shell:
     desc: appコンテナでシェルを開く
@@ -157,3 +157,11 @@ tasks:
         '
       - pnpm exec playwright install --with-deps
       - pnpm test:e2e
+
+  precheck:
+    desc: コミット前に実行する検証（lint/typecheck/unit）
+    cmds:
+      - PNPM_YES=true pnpm install --frozen-lockfile
+      - pnpm lint
+      - pnpm typecheck
+      - pnpm test
