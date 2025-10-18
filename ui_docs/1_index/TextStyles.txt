@@ -1,0 +1,182 @@
+// 利用規約
+text-white
+text-xs
+font-normal
+font-['Noto_Sans']
+leading-loose
+---
+// プライバシーポリシー<br/>
+text-white
+text-xs
+font-normal
+font-['Noto_Sans']
+leading-loose
+---
+// @2025 E-kanji
+text-stone-300
+text-[10px]
+font-normal
+font-['Noto_Sans']
+leading-loose
+---
+// スマホ画面<br/>貼る
+text-black
+text-lg
+font-bold
+font-['Noto_Sans']
+---
+// 最終結果を確認する
+text-black
+text-xs
+font-bold
+font-['Noto_Sans']
+---
+// 1位になったご飯屋にみんなで行きましょう！
+text-black
+text-xs
+font-normal
+font-['Noto_Sans']
+---
+// スマホ画面<br/>貼る
+text-black
+text-lg
+font-bold
+font-['Noto_Sans']
+---
+// 投票する
+text-black
+text-xs
+font-bold
+font-['Noto_Sans']
+---
+// URL内で、投票をしましょう。<br/>2択なので、ラクラク選択をしていきましょう！
+text-black
+text-xs
+font-normal
+font-['Noto_Sans']
+---
+// スマホ画面<br/>貼る
+text-black
+text-lg
+font-bold
+font-['Noto_Sans']
+---
+// 2.メンバーにシェアする
+text-black
+text-xs
+font-bold
+font-['Noto_Sans']
+---
+// URLやQRコードを用いて、グループにシェアしましょう。また、他の人を跨いでシェアすることも可能です。
+text-black
+text-xs
+font-normal
+font-['Noto_Sans']
+---
+// スマホ画面<br/>貼る
+text-black
+text-lg
+font-bold
+font-['Noto_Sans']
+---
+// グループを作成する
+text-black
+text-xs
+font-bold
+font-['Noto_Sans']
+---
+// まずはグループを作成します。<br/>イベントのタイトルと、探したいお店の条件を<br/>入力します。
+text-black
+text-xs
+font-normal
+font-['Noto_Sans']
+---
+// 1分でわかる<br/>「いー幹事？」の使い方
+text-black
+text-lg
+font-bold
+font-['Noto_Sans']
+---
+// サークルの新歓、放課後,,,etc<br/>様々なシチュエーションで活躍
+text-black
+text-lg
+font-bold
+font-['Noto_Sans']
+---
+// 特徴その2
+text-amber-500
+text-base
+font-bold
+font-['Noto_Sans']
+---
+// 会員登録不要でかんたん利用
+text-black
+text-lg
+font-bold
+font-['Noto_Sans']
+---
+// スワイプによるYES/NO選択によって、簡単に<br/>ご飯の行き先を決めることができます
+text-black
+text-xs
+font-normal
+font-['Noto_Sans']
+---
+// 実際の画面
+text-black
+text-xs
+font-normal
+font-['Noto_Sans']
+---
+// 特徴その１
+text-amber-500
+text-base
+font-bold
+font-['Noto_Sans']
+---
+// 1番簡単な投票方法
+text-black
+text-lg
+font-bold
+font-['Noto_Sans']
+---
+// スワイプによるYES/NO選択によって、簡単に<br/>ご飯の行き先を決めることができます
+text-black
+text-xs
+font-normal
+font-['Noto_Sans']
+---
+// 実際の画面
+text-black
+text-xs
+font-normal
+font-['Noto_Sans']
+---
+// はじめる
+text-white
+text-lg
+font-bold
+font-['Noto_Sans']
+---
+// 「いー幹事？」は、グループでのご飯屋を見つける際のわずらわしさをシンプルに解決してくれる無料のサービスです。
+text-black
+text-lg
+font-normal
+font-['Noto_Sans']
+---
+// 「ここどうかな？」<br/>の負担はもうない。
+text-amber-500
+text-3xl
+font-bold
+font-['Noto_Sans']
+---
+// モグモグ
+text-amber-500
+text-base
+font-bold
+font-['Noto_Sans']
+---
+// MoguMogu
+text-amber-500
+text-3xl
+font-bold
+font-['Noto_Sans']
