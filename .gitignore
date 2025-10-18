@@ -1,1 +1,8 @@
 AGENTS.md
+.env
+.env.*
+.pnpm-store/
+/node_modules/
+.vercel
+drizzle/
+dist/

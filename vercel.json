@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/**/*": {
+      "runtime": "@vercel/node@5.4.0"
+    }
+  },
+  "redirects": [],
+  "rewrites": []
+}
