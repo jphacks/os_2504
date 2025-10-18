@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { renderToString } from 'react-dom/server';
+import App from './app/App';
 
-describe('smoke', () => {
-  it('adds numbers', () => {
-    expect(1+1).toBe(2);
+describe('App', () => {
+  it('renders MogFinder prototype heading', () => {
+    const html = renderToString(<App />);
+    expect(html).toContain('MogFinder プロトタイプ');
   });
 });
