@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "express": "^5.0.0",
-    "drizzle-orm": "^0.31.0",
+    "drizzle-orm": "^0.44.6",
     "pg": "^8.12.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -42,7 +42,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^9.0.1",
     "dotenv": "^16.4.5",
-    "drizzle-kit": "^0.26.0",
+    "drizzle-kit": "^0.31.5",
     "eslint": "^9.12.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.12",
