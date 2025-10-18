@@ -120,7 +120,10 @@ const SAMPLE_RESTAURANTS: Restaurant[] = [
   },
 ];
 
-const SHARE_BASE_URL = (process.env.APP_SHARE_BASE_URL ?? 'https://mogfinder.app') + '/r/';
+const rawShareBase =
+  process.env.APP_SHARE_BASE_URL ??
+  (process.env.NODE_ENV === 'production' ? 'https://mogfinder.app' : 'http://localhost:5173');
+const SHARE_BASE_URL = `${rawShareBase.replace(/\/+$/, '')}/r/`;
 
 function generateRoomCode(): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
