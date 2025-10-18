@@ -115,3 +115,45 @@ tasks:
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} up -d db
       - docker compose -f {{.COMPOSE_FILE}} run --rm app pnpm tsx server/scripts/seed.ts
+
+  test:api:
+    desc: ローカルPostgreSQLで API 統合テストを実行
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} up -d db
+      - |
+        bash -lc '
+          export DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/app?sslmode=disable"
+          pnpm test:api
+        '
+
+  test:e2e:
+    desc: Playwright E2E テスト（Docker 開発環境利用）
+    cmds:
+      - defer: task stop
+      - task: dev:detach
+      - |
+        bash -lc '
+          echo "Waiting for http://localhost:5173 ..."
+          for i in $(seq 1 120); do
+            if curl -fsS http://localhost:5173 >/dev/null 2>&1; then
+              echo "Frontend is reachable."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timed out waiting for http://localhost:5173" >&2
+          exit 1
+        '
+      - |
+        docker compose -f {{.COMPOSE_FILE}} exec app bash -lc '
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timed out waiting for API health" >&2
+          exit 1
+        '
+      - pnpm exec playwright install --with-deps
+      - pnpm test:e2e

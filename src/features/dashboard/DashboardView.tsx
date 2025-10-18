@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
-import type { Member, RankingItem, Restaurant, RoomSummary, StepId } from '../../lib/types';
+import type {
+  Member,
+  RankingItem,
+  Restaurant,
+  RestaurantDetail,
+  RestaurantReview,
+  RoomSummary,
+  StepId,
+} from '../../lib/types';
 import { buttonDanger, buttonMuted, buttonPrimary, buttonSecondary, panelClass } from '../../lib/ui';
 import { StepIndicator } from './StepIndicator';
 
@@ -22,6 +30,11 @@ export function DashboardView() {
   const [memberToken, setMemberToken] = useState<string | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [ranking, setRanking] = useState<RankingItem[]>([]);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<RestaurantDetail | null>(null);
+  const [selectedReviews, setSelectedReviews] = useState<RestaurantReview[]>([]);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<{ tone: 'info' | 'success' | 'error'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -162,6 +175,7 @@ export function DashboardView() {
         { headers: { Authorization: `Bearer ${memberToken}` } },
       );
       if (result.ok) {
+        resetDetailPanel();
         setRestaurants(result.data.items);
         showMessage('info', '最新の候補カードを取得しました。');
       }
@@ -187,6 +201,37 @@ export function DashboardView() {
     } catch (error) {
       showMessage('error', (error as Error).message);
     }
+  };
+
+  const loadRestaurantDetail = async (placeId: string) => {
+    setSelectedPlaceId(placeId);
+    setIsDetailLoading(true);
+    setDetailError(null);
+    try {
+      const [detailRes, reviewsRes] = await Promise.all([
+        api<{ ok: boolean; data: RestaurantDetail }>(`/api/restaurants/${placeId}`),
+        api<{ ok: boolean; data: RestaurantReview[] }>(`/api/restaurants/${placeId}/reviews`),
+      ]);
+      if (detailRes.ok) {
+        setSelectedDetail(detailRes.data);
+      }
+      if (reviewsRes.ok) {
+        setSelectedReviews(reviewsRes.data);
+      }
+    } catch (error) {
+      setDetailError((error as Error).message);
+      setSelectedDetail(null);
+      setSelectedReviews([]);
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
+
+  const resetDetailPanel = () => {
+    setSelectedPlaceId(null);
+    setSelectedDetail(null);
+    setSelectedReviews([]);
+    setDetailError(null);
   };
 
   const fetchRanking = async () => {
@@ -407,16 +452,19 @@ export function DashboardView() {
                         <span>★ {r.rating.toFixed(1)}</span>
                         <span>{r.user_ratings_total} 件</span>
                       </div>
-                      <div className="restaurant-card__actions">
-                        <button className={buttonSecondary} onClick={() => sendVote(r.place_id, false)}>
-                          良くないね
-                        </button>
-                        <button className={buttonDanger} onClick={() => sendVote(r.place_id, true)}>
-                          いいね
-                        </button>
-                      </div>
-                    </article>
-                  ))}
+                    <div className="restaurant-card__actions">
+                      <button className={buttonSecondary} onClick={() => sendVote(r.place_id, false)}>
+                        良くないね
+                      </button>
+                      <button className={buttonDanger} onClick={() => sendVote(r.place_id, true)}>
+                        いいね
+                      </button>
+                      <button className={buttonMuted} onClick={() => loadRestaurantDetail(r.place_id)}>
+                        詳細
+                      </button>
+                    </div>
+                  </article>
+                ))}
                   {restaurants.length === 0 && (
                     <p className="placeholder-box">
                       カードがまだありません。投票を開始するには「カード取得」を押してください。
@@ -527,6 +575,103 @@ export function DashboardView() {
                     </li>
                   )}
                 </ol>
+              </section>
+            )}
+
+            {room && selectedPlaceId && (
+              <section className={panelClass}>
+                <div className="panel__header">
+                  <div>
+                    <h2>店舗詳細</h2>
+                    <p>投票候補の情報と最新レビューを確認できます。</p>
+                  </div>
+                  <button className={buttonSecondary} onClick={resetDetailPanel}>
+                    閉じる
+                  </button>
+                </div>
+                <div className="panel__body panel__body--spaced">
+                  {isDetailLoading && <p className="placeholder-box">読み込み中です…</p>}
+                  {detailError && <p className="notice notice--error">{detailError}</p>}
+                  {!isDetailLoading && !detailError && selectedDetail && (
+                    <div className="detail-panel">
+                      <div className="detail-panel__header">
+                        <h3>{selectedDetail.name}</h3>
+                        {selectedDetail.summary_simple && <p>{selectedDetail.summary_simple}</p>}
+                        <div className="detail-panel__meta">
+                          {selectedDetail.rating !== null && (
+                            <span>★ {selectedDetail.rating.toFixed(1)}</span>
+                          )}
+                          {selectedDetail.user_ratings_total !== null && (
+                            <span>{selectedDetail.user_ratings_total} 件</span>
+                          )}
+                          {selectedDetail.types && selectedDetail.types.length > 0 && (
+                            <span>{selectedDetail.types.join(', ')}</span>
+                          )}
+                        </div>
+                      </div>
+                      <dl className="detail-panel__list">
+                        {selectedDetail.address && (
+                          <div>
+                            <dt>住所</dt>
+                            <dd>{selectedDetail.address}</dd>
+                          </div>
+                        )}
+                        {selectedDetail.phone_number && (
+                          <div>
+                            <dt>電話</dt>
+                            <dd>{selectedDetail.phone_number}</dd>
+                          </div>
+                        )}
+                        {selectedDetail.website && (
+                          <div>
+                            <dt>公式サイト</dt>
+                            <dd>
+                              <a href={selectedDetail.website} target="_blank" rel="noreferrer">
+                                {selectedDetail.website}
+                              </a>
+                            </dd>
+                          </div>
+                        )}
+                        {selectedDetail.google_maps_url && (
+                          <div>
+                            <dt>Google Maps</dt>
+                            <dd>
+                              <a href={selectedDetail.google_maps_url} target="_blank" rel="noreferrer">
+                                マップで開く
+                              </a>
+                            </dd>
+                          </div>
+                        )}
+                      </dl>
+                      {selectedDetail.opening_hours?.weekday_text && (
+                        <div className="detail-panel__hours">
+                          <h4>営業時間</h4>
+                          <ul>
+                            {selectedDetail.opening_hours.weekday_text.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="detail-panel__reviews">
+                        <h4>レビュー</h4>
+                        {selectedReviews.length === 0 && <p className="placeholder-box">レビューがまだありません。</p>}
+                        <ul>
+                          {selectedReviews.map((review) => (
+                            <li key={review.id} className="detail-panel__review">
+                              <p className="detail-panel__review-meta">
+                                <span>{review.author_name ?? '匿名'}</span>
+                                {review.rating !== null && <span>★ {review.rating}</span>}
+                                {review.time && <span>{new Date(review.time).toLocaleString()}</span>}
+                              </p>
+                              {review.text && <p>{review.text}</p>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </section>
             )}
           </div>

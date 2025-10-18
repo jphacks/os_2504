@@ -22,7 +22,7 @@
   - `/rooms` 作成・設定更新・取得、`/members` 追加／一覧／セッション発行、`/restaurants` カード取得、`/likes` 投票・一覧・リセット、`/ranking` 集計の各エンドポイントを揃える。
   - JWT発行と検証はプレーンな署名検証で実装し、期限切れ・権限エラーをレスポンス化。
 - **テスト**
-  - Vitest + Supertest でインメモリAPIの主要ユースケースを自動化（正常系／権限エラー／状態遷移ガード）。
+  - Vitest + Supertest で API 統合テスト（`tests/api/**/*.test.ts`）を整備し、`pnpm test:api`（推奨: `docker compose run --rm app pnpm test:api`）で実行可能にする。
   - 非同期準備ジョブは時間短縮パラメータを設け、テスト内で完了確認。
 - **DB導入準備**
   - `docs/Table.md` を元に Drizzle スキーマドラフトを `server/db/schema.ts` などに作成（実際のマイグレーションは保留）。
@@ -75,7 +75,7 @@
   - `server/routes/rooms.ts` のリクエスト Body/Query を zod で検証し、`error.details` にフィールド情報を付与。
   - 設定更新時の値チェック（緯度経度範囲、価格帯0-4等）を追加。
 - **テスト更新**
-  - Supertest で `GET /rooms/:code` (waiting/voting) と `POST /members` バリデーション系をカバー。
+  - Supertest で `GET /rooms/:code` (waiting/voting) と `POST /members` バリデーション系をカバーし、`pnpm test:api` のシナリオに追加。
   - Playwright シナリオ：`/dashboard` でルーム作成→`/r/:code` 参加→投票→ランキング確認まで自動化。
 
 ### M3.2 (2025-11-28〜2025-12-05) 非同期処理／運用想定の整備

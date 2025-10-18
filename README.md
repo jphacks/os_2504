@@ -21,6 +21,28 @@ task dev
 
 `task dev`（= Docker Compose）で Vite・Express・PostgreSQL をまとめて起動します。`.env` の `DATABASE_URL` は Docker 内の Postgres を指すようにしてください。
 
+### サンプルデータ投入
+
+```bash
+task db:seed
+```
+
+Drizzle スキーマに対応したダミー店舗／レビューが PostgreSQL に投入され、フロント・API の実動作確認が容易になります。
+
+### テスト
+
+```bash
+task test:api
+```
+
+主要 API フローを Supertest + Vitest で検証する統合テストです。ホスト側で直接実行する場合は、`DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app?sslmode=disable` をセットしてください。
+
+```bash
+task test:e2e
+```
+
+フロントエンドの E2E テスト（Playwright）。内部で Docker 開発環境を起動し、待機後にブラウザテストを実行します。
+
 ## 本番デプロイ（概要）
 
 1. Cloud SQL for PostgreSQL を作成し、接続ユーザーを準備。
