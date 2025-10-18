@@ -8,3 +8,5 @@ node_modules_backup_*/
 .vercel
 drizzle/
 dist/
+.serena/
+private/
