@@ -1,0 +1,103 @@
+/** @import must precede all other statements */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /**
+   * Tailwind CSS theme
+   * tailwind.config.ts expects the following color variables to be expressed as HSL values.
+   * A different format will require also updating the theme in tailwind.config.ts.
+  */
+  :root {
+    --background: 48 100% 94.3%;
+    --foreground: 0 0% 0%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    --primary: 35 100% 46.1%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 48 100% 88.6%;
+    --secondary-foreground: 0 0% 0%;
+
+    --muted: 0 0% 85.1%;
+    --muted-foreground: 0 0% 45.1%;
+
+    --accent: 48 100% 88.6%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 100% 46.1%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 85.1%;
+    --input: 0 0% 85.1%;
+    --ring: 35 100% 46.1%;
+
+    --radius: 0.5rem;
+
+    --header-bg: 48 100% 88.6%;
+    --checkbox-bg: 345 26.3% 30.2%;
+  }
+
+  .dark {
+    --background: 48 100% 94.3%;
+    --foreground: 0 0% 0%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    --primary: 35 100% 46.1%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 48 100% 88.6%;
+    --secondary-foreground: 0 0% 0%;
+
+    --muted: 0 0% 85.1%;
+    --muted-foreground: 0 0% 45.1%;
+
+    --accent: 48 100% 88.6%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 100% 46.1%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 85.1%;
+    --input: 0 0% 85.1%;
+    --ring: 35 100% 46.1%;
+
+    --header-bg: 48 100% 88.6%;
+    --checkbox-bg: 345 26.3% 30.2%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Noto Sans', -apple-system, Roboto, Helvetica, sans-serif;
+  }
+
+  :where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  pre,
+  code {
+    overflow-x: auto;
+    white-space: pre;
+  }
+}
