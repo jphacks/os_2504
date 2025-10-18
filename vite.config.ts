@@ -13,5 +13,9 @@ export default defineConfig({
       }
     }
   },
+  build: {
+    outDir: 'dist/client',
+    emptyOutDir: true
+  },
   preview: { port: 5173 }
 });

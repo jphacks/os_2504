@@ -1,11 +1,11 @@
-# Fullstack Starter: Vite + React 19 + Tailwind v4 + Vercel Functions + Drizzle (PostgreSQL)
+# Fullstack Starter: Vite + React 19 + Tailwind v4 + Cloud Run API + Drizzle (PostgreSQL)
 
 - Frontend: Vite + React 19 + Tailwind CSS v4 (Zero-config)
-- API: Vercel Functions (Node.js runtime, `/api`)
-- DB: PostgreSQL (local: Docker, prod: Vercel Postgres / Neon)
+- API: Express + Node.js を Cloud Run 上で実行（`/api/*`）
+- DB: PostgreSQL（ローカル: Docker、プロダクション: Cloud SQL for PostgreSQL）
 - ORM: Drizzle ORM + drizzle-kit
-- Dev: Taskfile + Docker (`task dev`でホスト差分を最小化)
-- CI/CD: GitHub Actions（PR時: lint/typecheck/test/build、main: 自動デプロイ）
+- Dev: Taskfile + Docker (`task dev` でホスト差分を最小化)
+- CI/CD: GitHub Actions（PR時: lint/typecheck/test/build、main: Cloud Run へ自動デプロイ）
 
 ## Quick Start (Taskfile + Docker)
 1. 前提ツール
@@ -21,9 +21,7 @@
    ```
    - バックグラウンド起動したい場合は `task dev:detach`
 4. 初回起動時は依存関係のインストールが実行されるので完了まで待つ
-5. API 用の Vercel CLI 認証
-   - `VERCEL_TOKEN` を `.env` に設定する（Personal Token を [Vercel Dashboard](https://vercel.com/account/tokens) で発行）
-   - もしくは `task shell` でコンテナに入り `vercel login` を実行（メールリンクで認証）
+5. API サーバーは `pnpm dev:server` で Express をホットリロードしています。`.env` の `DATABASE_URL` が PostgreSQL（Docker コンテナ）を向くように維持してください。
 6. DBマイグレーション等のコマンドは Task 経由で実行（`task db:migrate` など）。Drizzle Studio を開きたい場合は `task db:studio`。
 7. ブラウザとツール類
    - Web: `http://localhost:5173`
@@ -34,21 +32,59 @@
 - PR 前に CI 相当のチェックを走らせたい場合は `task ci` を実行すると、Docker 上で `lint`/`typecheck`/`test`/`build` が一括で行われます。
 - 実行後は自動的にコンテナが停止／クリーンアップされます（既に `task dev` 実行中の場合は停止されるため注意してください）。
 
+## 本番ビルドの簡易検証
+- `task prod:test` を実行すると、ローカルで `pnpm build` を行ったうえで `dist/server/index.js` を直接起動し、`http://127.0.0.1:8080/api/health` に対してヘルスチェックを行います。
+- `DATABASE_URL` が未設定の場合は `postgresql://postgres:postgres@localhost:5432/app?sslmode=disable` が利用されるため、別途PostgreSQLが起動していることを確認してください。
+
 停止は `task stop`、ボリュームごと破棄する場合は `task clean` を使用してください。ログのみ追いたい場合は `task logs`。
 
-> `task dev` は Docker 内で `pnpm dev` を実行し、Vite(5173)と `vercel dev`(3000) を同時に提供します。Vite 側は `/api/*` を 3000 にプロキシします。認証済みでない場合は上記ステップ5を参照してください。
+> `task dev` は Docker 内で `pnpm dev` を実行し、Vite(5173) と Express サーバー(3000) を同時に提供します。Vite 側は `/api/*` を 3000 にプロキシするため、フロントからの API 呼び出しは同一オリジンで完結します。
 
 ## データモデル
 - `db/schema.ts` に Drizzle ORM のスキーマを定義しています。
-- `api/todos.ts` は Drizzle ORM 経由で PostgreSQL にアクセスし、初回リクエスト時にテーブルを自動作成します（本番ではマイグレーション適用が推奨です）。
+- `server/routes/todos.ts` は Drizzle ORM 経由で PostgreSQL にアクセスし、初回リクエスト時にテーブルを自動作成します（本番ではマイグレーション適用が推奨です）。
 
-## デプロイ（Vercel）
-- Vercel プロジェクトにこのリポジトリを接続
-- 環境変数を設定
-  - `DATABASE_URL`: Vercel Postgres や Neon などの接続文字列
-  - GitHub に以下の Secrets を設定（Actions からデプロイする場合）
-  - `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
-- main にマージすると Actions により `vercel build/deploy` が実行されます。
+## デプロイ（Cloud Run）
+
+### リソース準備（1回限り）
+1. Cloud SQL for PostgreSQL インスタンスを用意し、データベースとユーザーを作成します。
+2. Cloud Run サービス用プロジェクトを決め、Artifact Registry に Docker リポジトリを作成します（例: `asia-northeast1-docker.pkg.dev/<PROJECT_ID>/fullstack/app`）。
+3. サービスアカウントを作成し、以下のロールを付与します。
+   - `roles/run.admin`
+   - `roles/iam.serviceAccountUser`
+   - `roles/artifactregistry.writer`
+   - Cloud SQL 利用時は `roles/cloudsql.client`
+4. 作成したサービスアカウントの JSON キーを GitHub Secrets（例: `GCP_SERVICE_ACCOUNT_KEY`）として登録します。
+5. GitHub Secrets または Variables に以下を設定します。
+   - `GCP_PROJECT_ID`
+   - `GCP_REGION`（例: `asia-northeast1`）
+   - `CLOUD_RUN_SERVICE`（例: `fullstack-app`）
+   - `ARTIFACT_REPOSITORY`（Artifact Registry のリポジトリ名。例: `fullstack`）
+   - `CLOUD_SQL_CONNECTION`（Cloud SQL Auth Proxy を使う場合: `<PROJECT_ID>:<REGION>:<INSTANCE_NAME>`。未使用なら空文字のままで可）
+   - `DATABASE_URL`（Cloud SQL 用接続文字列。Private IP や Proxy 経由など環境に応じて設定）
+   - `DB_SSL`, `DB_SSL_STRICT`, `DB_MAX_CONNECTIONS`（必要に応じて）
+
+### ローカルからのデプロイ例
+
+```bash
+# イメージをビルドして Artifact Registry に push
+gcloud auth login
+gcloud config set project <PROJECT_ID>
+gcloud auth configure-docker asia-northeast1-docker.pkg.dev
+docker build -t asia-northeast1-docker.pkg.dev/<PROJECT_ID>/fullstack/app:latest .
+docker push asia-northeast1-docker.pkg.dev/<PROJECT_ID>/fullstack/app:latest
+
+# Cloud Run へデプロイ
+gcloud run deploy <CLOUD_RUN_SERVICE> \
+  --image=asia-northeast1-docker.pkg.dev/<PROJECT_ID>/fullstack/app:latest \
+  --region=asia-northeast1 \
+  --allow-unauthenticated \
+  --set-env-vars "DATABASE_URL=<your-connection-string>" \
+  --set-env-vars "DB_SSL=true,DB_SSL_STRICT=false" \
+  --min-instances=0 --max-instances=3
+```
+
+Cloud SQL の Private IP を使う場合は `--vpc-connector` でServerless VPC Access Connector を指定し、Public IP を使う場合は Cloud SQL Auth Proxy（`--add-cloudsql-instances`）を設定してください。
 
 ## Notes
 - Node は 22 LTS 固定（10/21/2025 までは現行 LTS）。Node 24 LTS 昇格後に上げる場合は `engines` と CI の node-version を更新してください。
