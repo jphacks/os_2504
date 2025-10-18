@@ -347,6 +347,26 @@ function HostDashboard() {
     }
   };
 
+  const copyShareUrl = async () => {
+    if (!room?.share_url) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(room.share_url);
+        showMessage('success', '共有URLをクリップボードにコピーしました。');
+      } else {
+        throw new Error('クリップボードAPIが利用できません。手動でコピーしてください。');
+      }
+    } catch (error) {
+      showMessage('error', (error as Error).message);
+    }
+  };
+
+  const openShareUrl = () => {
+    if (!room?.share_url) return;
+    window.open(room.share_url, '_blank', 'noopener,noreferrer');
+    showMessage('info', '別タブで共有URLを開きました。');
+  };
+
   return (
     <main className="app">
       <div className="app__container">
@@ -592,6 +612,31 @@ function HostDashboard() {
           </div>
 
           <div className="app__side-column">
+            {room && (
+              <section className={panelClass}>
+                <div className="panel__header">
+                  <div>
+                    <h2>共有リンク</h2>
+                    <p>参加者に共有するURLやQRコードをここから取得できます。</p>
+                  </div>
+                  <button className={buttonSecondary} onClick={copyShareUrl}>
+                    コピー
+                  </button>
+                </div>
+                <div className="panel__body">
+                  <div className="share-panel__url">
+                    <span>{room.share_url}</span>
+                    <button className={buttonSecondary} onClick={openShareUrl}>
+                      ブラウザで開く
+                    </button>
+                  </div>
+                  <p className="share-panel__hint">
+                    ローカル開発では <code>http://localhost:5173/r/{room.room_code}</code> を共有してください。参加者はこのURLから投票画面にアクセスできます。
+                  </p>
+                </div>
+              </section>
+            )}
+
             {room && (
               <section className={panelClass}>
                 <div className="panel__header">
@@ -900,6 +945,16 @@ function ParticipantApp({ roomCode }: { roomCode: string }) {
       showMessage('error', (error as Error).message);
     }
   };
+
+  useEffect(() => {
+    if (!session) return;
+    void fetchRanking();
+  }, [session]);
+
+  useEffect(() => {
+    if (!session || room?.status !== 'voting') return;
+    void fetchRestaurants();
+  }, [session, room?.status]);
 
   return (
     <main className="app">

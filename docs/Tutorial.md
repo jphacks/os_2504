@@ -28,6 +28,11 @@
    - Functions(API): `http://localhost:3000/api/health`, `http://localhost:3000/api/todos`
    - Adminer(DB GUI): `http://localhost:8080`
 
+## SPA Routes (Pre-DB MogFinder Prototype)
+- `/` : 幹事向けダッシュボード。ルーム作成・共有リンク発行・メンバー管理・投票カード配布・ランキング確認。
+- `/r/:roomCode` : 参加者向けビュー。共有URLからアクセスし、既存メンバー選択または新規登録→トークン発行→投票→ランキング閲覧が可能。
+- 開発環境では共有URLが `http://localhost:5173/r/<ROOM_CODE>` 形式で生成されます。`APP_SHARE_BASE_URL` を設定すると本番用ドメインに切り替えられます。
+
 ## ローカルCIチェック
 - PR 前に CI 相当のチェックを走らせたい場合は `task ci` を実行すると、Docker 上で `lint`/`typecheck`/`test`/`build` が一括で行われます。
 - 実行後は自動的にコンテナが停止／クリーンアップされます（既に `task dev` 実行中の場合は停止されるため注意してください）。
