@@ -112,8 +112,9 @@ export function DashboardView() {
       const result = await api<{ ok: boolean; data: Member[] }>(`/api/rooms/${roomCode}/members`);
       if (result.ok) {
         setMembers(result.data);
-        if (!selectedMemberId && result.data.length > 0) {
-          setSelectedMemberId(result.data[0].member_id);
+        const firstMember = result.data[0];
+        if (!selectedMemberId && firstMember) {
+          setSelectedMemberId(firstMember.member_id);
         }
         showMessage('info', 'メンバー一覧を更新しました。');
       }

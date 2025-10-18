@@ -6,7 +6,7 @@ export type Route =
 
 function parseRoute(pathname: string): Route {
   const match = /^\/r\/([A-Za-z0-9_-]+)/.exec(pathname.trim());
-  if (match) {
+  if (match && typeof match[1] === 'string') {
     return { kind: 'participant', roomCode: match[1] };
   }
   return { kind: 'dashboard' };

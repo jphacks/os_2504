@@ -23,11 +23,12 @@ function decode(token: string): TokenPayload | null {
   const parts = token.split('.');
   if (parts.length !== 3) return null;
   const [headerB64, bodyB64, signature] = parts;
+  if (!headerB64 || !bodyB64 || !signature) return null;
   const expectedSig = crypto
     .createHmac('sha256', SECRET)
     .update(`${headerB64}.${bodyB64}`)
     .digest('base64url');
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+  if (!crypto.timingSafeEqual(Buffer.from(signature, 'utf8'), Buffer.from(expectedSig, 'utf8'))) {
     return null;
   }
   try {

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import {
   addMember,
   createRoom,
@@ -38,7 +38,10 @@ function findRoom(req: RoomRequest, res: Response, next: NextFunction) {
   next();
 }
 
-function authenticateMember(req: RoomRequest, res: Response, next: NextFunction) {
+type MemberAwareRequest = RoomRequest & { memberId?: string };
+
+const authenticateMember: RequestHandler = (req, res, next) => {
+  const roomReq = req as MemberAwareRequest;
   const auth = req.get('authorization');
   if (!auth || !auth.startsWith('Bearer ')) {
     res.status(401).json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Authorization header required', details: {} } });
@@ -50,22 +53,22 @@ function authenticateMember(req: RoomRequest, res: Response, next: NextFunction)
     res.status(401).json({ ok: false, error: { code: 'INVALID_TOKEN', message: 'Invalid member token', details: {} } });
     return;
   }
-  if (!req.room) {
+  if (!roomReq.room) {
     res.status(500).json({ ok: false, error: { code: 'ROOM_NOT_LOADED', message: 'Room missing in request context', details: {} } });
     return;
   }
-  if (req.room.roomId !== verified.roomId) {
+  if (roomReq.room.roomId !== verified.roomId) {
     res.status(403).json({ ok: false, error: { code: 'ROOM_MISMATCH', message: 'Token does not belong to this room', details: {} } });
     return;
   }
-  const member = getMember(req.room, verified.memberId);
+  const member = getMember(roomReq.room, verified.memberId);
   if (!member) {
     res.status(403).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found in room', details: {} } });
     return;
   }
-  (req as RoomRequest & { memberId: string }).memberId = member.memberId;
+  roomReq.memberId = member.memberId;
   next();
-}
+};
 
 router.post('/', (req, res) => {
   const roomName = typeof req.body?.room_name === 'string' ? req.body.room_name.trim() : '';
@@ -74,7 +77,8 @@ router.post('/', (req, res) => {
     return;
   }
 
-  const settingsInput = typeof req.body?.settings === 'object' && req.body.settings !== null ? req.body.settings : {};
+  const settingsInput =
+    typeof req.body?.settings === 'object' && req.body.settings !== null ? req.body.settings : {};
   const room = createRoom({
     roomName,
     settings: {
@@ -139,9 +143,16 @@ router.post('/:room_code/members', findRoom, (req: RoomRequest, res: Response) =
   res.status(201).json({ ok: true, data: { member_id: member.memberId, member_name: member.memberName } });
 });
 
-router.post('/:room_code/members/:member_id/session', findRoom, (req: RoomRequest, res: Response) => {
+router.post(
+  '/:room_code/members/:member_id/session',
+  findRoom,
+  (req: RoomRequest, res: Response) => {
   const room = req.room!;
-  const { member_id: memberId } = req.params;
+  const memberId = typeof req.params.member_id === 'string' ? req.params.member_id : '';
+  if (!memberId) {
+    res.status(400).json({ ok: false, error: { code: 'MEMBER_ID_REQUIRED', message: 'member_id required', details: {} } });
+    return;
+  }
   const member = getMember(room, memberId);
   if (!member) {
     res.status(404).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found', details: {} } });
@@ -157,7 +168,8 @@ router.post('/:room_code/members/:member_id/session', findRoom, (req: RoomReques
       member: { member_id: member.memberId, member_name: member.memberName },
     },
   });
-});
+  },
+);
 
 router.get('/:room_code/restaurants', findRoom, (req: RoomRequest, res: Response) => {
   const room = req.room!;
@@ -175,8 +187,13 @@ router.get('/:room_code/restaurants', findRoom, (req: RoomRequest, res: Response
   });
 });
 
-router.post('/:room_code/likes', findRoom, authenticateMember, (req: RoomRequest & { memberId: string }, res: Response) => {
-  const room = req.room!;
+router.post(
+  '/:room_code/likes',
+  findRoom,
+  authenticateMember,
+  (req: Request, res: Response) => {
+  const memberReq = req as MemberAwareRequest & { memberId: string };
+  const room = memberReq.room!;
   if (room.status !== 'voting') {
     res.status(409).json({ ok: false, error: { code: 'ROOM_NOT_IN_VOTING', message: 'Voting is not available right now.', details: {} } });
     return;
@@ -192,7 +209,12 @@ router.post('/:room_code/likes', findRoom, authenticateMember, (req: RoomRequest
     res.status(404).json({ ok: false, error: { code: 'PLACE_NOT_FOUND', message: 'Restaurant not found', details: {} } });
     return;
   }
-  const like = recordLike({ room, memberId: req.memberId, placeId, isLiked });
+  const memberId = memberReq.memberId;
+  if (!memberId) {
+    res.status(500).json({ ok: false, error: { code: 'MEMBER_NOT_LOADED', message: 'Member missing in request context', details: {} } });
+    return;
+  }
+  const like = recordLike({ room, memberId, placeId, isLiked });
   res.json({
     ok: true,
     data: {
@@ -202,10 +224,16 @@ router.post('/:room_code/likes', findRoom, authenticateMember, (req: RoomRequest
       updated_at: like.updatedAt.toISOString(),
     },
   });
-});
+  },
+);
 
-router.get('/:room_code/likes', findRoom, authenticateMember, (req: RoomRequest & { memberId: string }, res: Response) => {
-  const room = req.room!;
+router.get(
+  '/:room_code/likes',
+  findRoom,
+  authenticateMember,
+  (req: Request, res: Response) => {
+  const memberReq = req as MemberAwareRequest;
+  const room = memberReq.room!;
   const members = Array.isArray(req.query.member_id)
     ? (req.query.member_id as string[])
     : typeof req.query.member_id === 'string'
@@ -230,22 +258,33 @@ router.get('/:room_code/likes', findRoom, authenticateMember, (req: RoomRequest 
   }));
 
   res.json({ ok: true, data: { items, next_cursor: null } });
-});
+  },
+);
 
-router.delete('/:room_code/likes/:member_id', findRoom, authenticateMember, (req: RoomRequest & { memberId: string }, res: Response) => {
-  const room = req.room!;
+router.delete(
+  '/:room_code/likes/:member_id',
+  findRoom,
+  authenticateMember,
+  (req: Request, res: Response) => {
+  const memberReq = req as MemberAwareRequest;
+  const room = memberReq.room!;
   if (room.status !== 'voting') {
     res.status(409).json({ ok: false, error: { code: 'ROOM_NOT_IN_VOTING', message: 'Voting is not available right now.', details: {} } });
     return;
   }
-  const { member_id: targetMemberId } = req.params;
+  const targetMemberId = typeof req.params.member_id === 'string' ? req.params.member_id : '';
+  if (!targetMemberId) {
+    res.status(400).json({ ok: false, error: { code: 'MEMBER_ID_REQUIRED', message: 'member_id required', details: {} } });
+    return;
+  }
   if (!getMember(room, targetMemberId)) {
     res.status(404).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found', details: {} } });
     return;
   }
   const deletedCount = resetLikes(room, targetMemberId);
   res.json({ ok: true, data: { reset: true, deleted_count: deletedCount } });
-});
+  },
+);
 
 router.get('/:room_code/ranking', findRoom, (req: RoomRequest, res: Response) => {
   const room = req.room!;
