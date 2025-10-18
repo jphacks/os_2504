@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from 'express';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import todosRouter from './routes/todos.js';
+import roomsRouter from './routes/rooms.js';
 
 const app = express();
 
@@ -17,7 +17,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ ok: true, ts: Date.now() });
 });
 
-app.use('/api/todos', todosRouter);
+app.use('/api/rooms', roomsRouter);
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   void _next;
