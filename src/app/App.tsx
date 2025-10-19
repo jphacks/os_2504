@@ -1,13 +1,7 @@
-import { DashboardView } from '../features/dashboard/DashboardView';
-import { ParticipantView } from '../features/participant/ParticipantView';
-import { useRoute } from '../hooks/useRoute';
+import AppRouter from './AppRouter'
 
 export function App() {
-  const route = useRoute();
-  if (route.kind === 'participant') {
-    return <ParticipantView roomCode={route.roomCode} />;
-  }
-  return <DashboardView />;
+  return <AppRouter />
 }
 
-export default App;
+export default App
