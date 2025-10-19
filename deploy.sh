@@ -80,7 +80,7 @@ echo "🔄 バックエンドのCORS設定を更新中..."
 gcloud run services update $BACKEND_SERVICE \
   --platform managed \
   --region $REGION \
-  --set-env-vars GOOGLE_API_KEY=$GOOGLE_API_KEY,ALLOWED_ORIGINS=$FRONTEND_URL
+  --set-env-vars GOOGLE_API_KEY=$GOOGLE_API_KEY,ALLOWED_ORIGINS=$FRONTEND_URL,FRONTEND_BASE_URL=$FRONTEND_URL
 
 echo ""
 echo "✨ デプロイ完了！"
