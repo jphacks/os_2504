@@ -19,11 +19,11 @@ MogFinder は、大学生などのグループが「今からご飯行こう！�
 📱 サイト URL  
 ➡️ https://mogufinder-frontend-hoji7n3kqq-an.a.run.app/  
 
-🎥 デモ動画 URL  
-➡️ https://youtube.com/shorts/Kcumb8yQy6A?si=1KQe1BSYp3M7FO0Z  
-
 ✅ スライドURL  
-➡️ https://www.canva.com/design/DAG2LrCa7kY/-gg3PFwBtXY_ITIqijopOg/edit?  utm_content=DAG2LrCa7kY&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton  
+➡️ https://www.canva.com/design/DAG2LrCa7kY/-gg3PFwBtXY_ITIqijopOg/edit?  utm_content=DAG2LrCa7kY&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
+
+## 🎥 デモ動画  
+[![Watch on YouTube](https://img.youtube.com/vi/Kcumb8yQy6A/hqdefault.jpg)](https://youtube.com/shorts/Kcumb8yQy6A)
 
 ---
 
