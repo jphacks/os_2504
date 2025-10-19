@@ -2,6 +2,8 @@
 「ご飯どこ行く？」でもう悩まない。
 ログイン不要、ワンリンクでグループ投票ができる飲食店決定支援アプリ。
 
+<img width="2616" height="1474" alt="image" src="https://github.com/user-attachments/assets/edc39a90-d782-4d9a-a4d1-8c4d93e4e7c8" />
+
 ---
 
 🚀 概要 (Overview)
