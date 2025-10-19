@@ -1,1 +1,1 @@
-// add JSDOM/RTL setup here if needed
+import '@testing-library/jest-dom/vitest';

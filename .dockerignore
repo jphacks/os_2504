@@ -5,3 +5,5 @@ docker-compose.dev.yml
 Dockerfile.dev
 .vscode
 .pnpm-store-user/
+# Exclude documentation UI assets from the Docker build context
+ui_docs

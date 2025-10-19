@@ -2,7 +2,9 @@ AGENTS.md
 .env
 .env.*
 .pnpm-store/
+.pnpm-store-user/
 /node_modules/
+node_modules_backup_*/
 .vercel
 drizzle/
 dist/

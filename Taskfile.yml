@@ -4,6 +4,16 @@ vars:
   COMPOSE_FILE: docker-compose.dev.yml
 
 tasks:
+  docker:up:
+    desc: DB/Adminer をバックグラウンド起動
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} up -d db adminer
+
+  docker:down:
+    desc: DB/Adminer を停止
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} down --remove-orphans
+
   dev:
     desc: コンテナ上でフロント・API(Express)・DBをまとめて起動
     cmds:
@@ -12,7 +22,7 @@ tasks:
   dev:detach:
     desc: バックグラウンドで開発環境を起動
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} up --build -d
+      - docker compose -f {{.COMPOSE_FILE}} up -d
 
   stop:
     desc: 開発用コンテナを停止
@@ -32,7 +42,7 @@ tasks:
   install:
     desc: 依存関係のみ事前にインストール
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} run --rm app bash -lc "pnpm install --frozen-lockfile"
+      - docker compose -f {{.COMPOSE_FILE}} run --rm app bash -lc "PNPM_YES=true pnpm install --frozen-lockfile"
 
   shell:
     desc: appコンテナでシェルを開く
@@ -85,14 +95,73 @@ tasks:
   db:generate:
     desc: drizzle-kit generate (コンテナ起動中に実行)
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} exec app pnpm db:generate
+      - docker compose -f {{.COMPOSE_FILE}} up -d db
+      - docker compose -f {{.COMPOSE_FILE}} run --rm app pnpm db:generate
 
   db:migrate:
     desc: drizzle-kit migrate (コンテナ起動中に実行)
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} exec app pnpm db:migrate
+      - docker compose -f {{.COMPOSE_FILE}} up -d db
+      - docker compose -f {{.COMPOSE_FILE}} run --rm app pnpm db:migrate
 
   db:studio:
     desc: drizzle-kit studio を起動
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} exec app pnpm db:studio
+      - docker compose -f {{.COMPOSE_FILE}} up -d db
+      - docker compose -f {{.COMPOSE_FILE}} run --rm --service-ports app pnpm db:studio
+
+  db:seed:
+    desc: サンプルデータを投入
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} up -d db
+      - docker compose -f {{.COMPOSE_FILE}} run --rm app pnpm tsx server/scripts/seed.ts
+
+  test:api:
+    desc: ローカルPostgreSQLで API 統合テストを実行
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} up -d db
+      - |
+        bash -lc '
+          export DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/app?sslmode=disable"
+          pnpm test:api
+        '
+
+  test:e2e:
+    desc: Playwright E2E テスト（Docker 開発環境利用）
+    cmds:
+      - defer: task stop
+      - task: dev:detach
+      - |
+        bash -lc '
+          echo "Waiting for http://localhost:5173 ..."
+          for i in $(seq 1 120); do
+            if curl -fsS http://localhost:5173 >/dev/null 2>&1; then
+              echo "Frontend is reachable."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timed out waiting for http://localhost:5173" >&2
+          exit 1
+        '
+      - |
+        docker compose -f {{.COMPOSE_FILE}} exec app bash -lc '
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timed out waiting for API health" >&2
+          exit 1
+        '
+      - pnpm exec playwright install --with-deps
+      - pnpm test:e2e
+
+  precheck:
+    desc: コミット前に実行する検証（lint/typecheck/unit）
+    cmds:
+      - PNPM_YES=true pnpm install --frozen-lockfile
+      - pnpm lint
+      - pnpm typecheck
+      - pnpm test
