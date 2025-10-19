@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1976d2" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MoguFinder - 飲食店探しアプリ</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Google Maps API グローバルコールバック
+      function initMap() {
+        console.log('Google Maps API loaded via callback');
+        window.googleMapsLoaded = true;
+        window.dispatchEvent(new Event('googleMapsLoaded'));
+      }
+      
+      // エラーハンドリング
+      function handleMapError() {
+        console.error('Failed to load Google Maps API');
+        window.googleMapsLoadError = true;
+        window.dispatchEvent(new Event('googleMapsLoadError'));
+      }
+      
+      window.initMap = initMap;
+      window.gm_authFailure = handleMapError; // Googleの認証失敗コールバック
+    </script>
+    <script
+      async
+      defer
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBLq-A6d7I_R4kngutOGvarrvhAhjqiWvM&callback=initMap&libraries=places"
+      onerror="handleMapError()">
+    </script>
+  </body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Debug Test</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>Google Maps API デバッグテスト</h1>
+    <pre id="log"></pre>
+    
+    <script>
+        const log = document.getElementById('log');
+        
+        function addLog(message) {
+            log.textContent += message + '\n';
+            console.log(message);
+        }
+        
+        addLog('=== Google Maps API デバッグ開始 ===');
+        addLog(`現在時刻: ${new Date().toISOString()}`);
+        addLog(`URL: ${window.location.href}`);
+        
+        // APIキーのテスト
+        const apiKey = 'AIzaSyBLq-A6d7I_R4kngutOGvarrvhAhjqiWvM';
+        addLog(`APIキー: ${apiKey.substring(0, 10)}...`);
+        
+        // Google Maps APIの読み込み状態をチェック
+        let attempts = 0;
+        const checkGoogleMaps = setInterval(() => {
+            attempts++;
+            
+            if (window.google) {
+                addLog(`\n✓ window.google が存在します`);
+                
+                if (window.google.maps) {
+                    addLog('✓ window.google.maps が存在します');
+                    clearInterval(checkGoogleMaps);
+                    testMapsAPI();
+                } else {
+                    addLog(`- window.google.maps はまだ存在しません (試行 ${attempts})`);
+                }
+            } else {
+                addLog(`- window.google はまだ存在しません (試行 ${attempts})`);
+            }
+            
+            if (attempts > 50) {
+                clearInterval(checkGoogleMaps);
+                addLog('\n✗ タイムアウト: Google Maps APIが読み込まれませんでした');
+                checkNetworkErrors();
+            }
+        }, 200);
+        
+        function testMapsAPI() {
+            addLog('\n=== Maps API テスト ===');
+            
+            try {
+                // 基本的なオブジェクトの確認
+                addLog(`✓ google.maps.version: ${google.maps.version}`);
+                addLog(`✓ google.maps.Map: ${typeof google.maps.Map}`);
+                addLog(`✓ google.maps.Marker: ${typeof google.maps.Marker}`);
+                
+                // マップを作成
+                const mapDiv = document.createElement('div');
+                mapDiv.style.width = '400px';
+                mapDiv.style.height = '300px';
+                document.body.appendChild(mapDiv);
+                
+                const map = new google.maps.Map(mapDiv, {
+                    center: { lat: 35.6762, lng: 139.6503 },
+                    zoom: 13
+                });
+                
+                addLog('✓ マップの作成に成功しました');
+                
+            } catch (error) {
+                addLog(`\n✗ エラー: ${error.message}`);
+                addLog(`スタックトレース: ${error.stack}`);
+            }
+        }
+        
+        function checkNetworkErrors() {
+            addLog('\n=== ネットワークエラーの確認 ===');
+            addLog('ブラウザの開発者ツール > ネットワークタブで以下を確認してください:');
+            addLog('1. maps.googleapis.com へのリクエストのステータスコード');
+            addLog('2. エラーメッセージの詳細');
+            addLog('3. コンソールタブのエラーメッセージ');
+        }
+    </script>
+    
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBLq-A6d7I_R4kngutOGvarrvhAhjqiWvM">
+    </script>
+</body>
+</html>
