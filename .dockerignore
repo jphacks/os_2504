@@ -4,3 +4,4 @@ dist
 docker-compose.dev.yml
 Dockerfile.dev
 .vscode
+.pnpm-store-user/

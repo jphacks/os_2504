@@ -8,3 +8,4 @@ drizzle/
 dist/
 .serena/
 private/
+.pnpm-store-user/
