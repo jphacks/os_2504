@@ -16,12 +16,22 @@ MogFinder は、大学生などのグループが「今からご飯行こう！�
 🎥 デモ動画 URL
 ➡️ https://youtube.com/shorts/Kcumb8yQy6A?si=1KQe1BSYp3M7FO0Z
 
+✅ スライドURL
+➡️ https://www.canva.com/design/DAG2LrCa7kY/-gg3PFwBtXY_ITIqijopOg/edit?utm_content=DAG2LrCa7kY&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
+
 ---
 
 🧑‍🤝‍🧑 課題とペルソナ (Persona)
-大学生がよくある「ご飯行こうぜ〜」のあと、
+ペルソナ：「放課後の大学生のグループ」
+課題：「ご飯の合意形成が遅い」
 
-候補多すぎたり、悩んだりして、
+具体例：
+A「放課後だし、ご飯行こうぜ〜」
+B「店調べたけど、これどう」
+C「う〜ん、ちょっとな〜」
+B「じゃあこれは？」
+,,,
+といったなかなか決まらない状況など。
 
 ---
 
@@ -32,6 +42,8 @@ MogFinder は、大学生などのグループが「今からご飯行こう！�
 集計により、グループ全員の嗜好を反映した「最適な一軒」を自動決定
 合意形成を支援・高速化
 
+<img width="416" height="914" alt="image" src="https://github.com/user-attachments/assets/a21b1b42-3c10-4d2e-8fed-56dd7ac270f8" />
+
 ---
 
 📦 スコープ (Scope)
@@ -40,7 +52,6 @@ MogFinder は、大学生などのグループが「今からご飯行こう！�
 グループ幹事がグループ URL を発行し、各種設定を行い、グループを作成する。
 メンバーがグループにワンリンク（QR コード読み込み）によって参加し、近場の飲食店をスワイプ形式で投票（UI はマッチングアプリ風）。
 個人でそれぞれ投票終了後、グループに適した飲食店がランキング形式で出力される。
-
 
 ---
 
@@ -52,6 +63,9 @@ MogFinder は、大学生などのグループが「今からご飯行こう！�
 メンバー名、検索場所（位置情報 or 指定）を設定
 URL / QR コードを発行
 
+<img width="545" height="864" alt="スクリーンショット 2025-10-20 8 34 04" src="https://github.com/user-attachments/assets/5b70496a-7c85-4ff9-8b1a-d5adee4eea03" />
+(メンバー作成画面、このあとQRが発行されます)
+
 
 グループ参加
 
@@ -59,6 +73,8 @@ URL / QR コードを発行
 メンバーがリンクを踏む or QR を読み込んでアクセス
 グループにて指定された位置情報に基づく飲食店候補を取得
 表示画面を見ながら「いいね」「良くないね」を行う
+<img width="416" height="914" alt="image" src="https://github.com/user-attachments/assets/11f38c13-cc30-44e4-b2d3-10ecd8edabe1" />
+(投票画面)
 
 
 投票確認
@@ -66,7 +82,8 @@ URL / QR コードを発行
    
 結果をランキング形式で出力
 グループで行く店舗の指標となる
-
+<img width="817" height="1348" alt="image" src="https://github.com/user-attachments/assets/42395cd0-9415-4a07-9910-895f0c2879c2" />
+(結果画面 なお、リンク発行した代表の方が投票を締め切ることで表示可能)
 
 ---
 
