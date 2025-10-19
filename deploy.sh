@@ -15,6 +15,11 @@ echo "プロジェクト: $PROJECT_ID"
 echo "リージョン: $REGION"
 echo ""
 
+if [ -z "$VITE_GOOGLE_MAPS_API_KEY" ]; then
+  echo "❌ エラー: VITE_GOOGLE_MAPS_API_KEY が設定されていません (.env などでエクスポートしてください)"
+  exit 1
+fi
+
 # プロジェクト設定
 echo "📝 プロジェクト設定..."
 gcloud config set project $PROJECT_ID
@@ -50,7 +55,7 @@ echo "🎨 フロントエンドをビルド・デプロイ中..."
 # フロントエンドのビルド（本番用Dockerfileを使用）
 gcloud builds submit ./frontend \
   --config ./frontend/cloudbuild.yaml \
-  --substitutions _VITE_API_URL=$BACKEND_URL
+  --substitutions _VITE_API_URL=$BACKEND_URL,_VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY:-}
 
 gcloud run deploy $FRONTEND_SERVICE \
   --image gcr.io/$PROJECT_ID/$FRONTEND_SERVICE \

@@ -8,6 +8,8 @@ steps:
       - 'Dockerfile.prod'
       - '--build-arg'
       - 'VITE_API_URL=${_VITE_API_URL}'
+      - '--build-arg'
+      - 'VITE_GOOGLE_MAPS_API_KEY=${_VITE_GOOGLE_MAPS_API_KEY}'
       - '.'
 images:
   - 'gcr.io/$PROJECT_ID/mogufinder-frontend'
