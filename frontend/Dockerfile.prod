@@ -12,9 +12,11 @@ RUN npm install --legacy-peer-deps
 # Copy application code
 COPY . .
 
-# Build argument for API URL
+# Build arguments for environment variables
 ARG VITE_API_URL
+ARG VITE_GOOGLE_MAPS_API_KEY
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
 
 # Build for production
 RUN npm run build

@@ -20,9 +20,16 @@
         addLog(`現在時刻: ${new Date().toISOString()}`);
         addLog(`URL: ${window.location.href}`);
         
-        // APIキーのテスト
-        const apiKey = 'AIzaSyBLq-A6d7I_R4kngutOGvarrvhAhjqiWvM';
-        addLog(`APIキー: ${apiKey.substring(0, 10)}...`);
+        // APIキーの取得（?apiKey=YOUR_KEY を指定）
+        const params = new URLSearchParams(window.location.search);
+        const apiKey = params.get('apiKey');
+
+        if (!apiKey) {
+            addLog('✗ クエリパラメータ `apiKey` が指定されていません');
+            addLog('例: test-api.html?apiKey=YOUR_KEY');
+        } else {
+            addLog(`APIキー: ${apiKey.substring(0, 10)}...`);
+        }
         
         // Google Maps APIの読み込み状態をチェック
         let attempts = 0;
@@ -87,8 +94,18 @@
         }
     </script>
     
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBLq-A6d7I_R4kngutOGvarrvhAhjqiWvM">
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const apiKey = params.get('apiKey');
+
+        if (apiKey) {
+            const script = document.createElement('script');
+            script.async = true;
+            script.defer = true;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+            script.onerror = () => addLog('✗ Google Maps API の読み込みに失敗しました');
+            document.head.appendChild(script);
+        }
     </script>
 </body>
 </html>

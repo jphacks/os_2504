@@ -36,3 +36,7 @@ Thumbs.db
 
 # PWA
 sw.js.map
+
+.pnpm-store-user/
+.serena/
+private/

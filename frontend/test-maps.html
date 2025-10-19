@@ -91,9 +91,21 @@
         });
     </script>
 
-    <!-- Google Maps API -->
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBLq-A6d7I_R4kngutOGvarrvhAhjqiWvM&libraries=places">
+    <script type="module">
+        const params = new URLSearchParams(window.location.search);
+        const apiKey = params.get('apiKey');
+
+        if (!apiKey) {
+            window.addMessage('✗ クエリパラメータ `apiKey` が指定されていません', true);
+        } else {
+            window.addMessage(`✓ APIキーを使用してスクリプトを読み込みます (${apiKey.substring(0, 10)}...)`);
+            const script = document.createElement('script');
+            script.async = true;
+            script.defer = true;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+            script.onerror = () => window.addMessage('✗ Google Maps API の読み込みに失敗しました', true);
+            document.head.appendChild(script);
+        }
     </script>
 </body>
 </html>
