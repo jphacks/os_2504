@@ -1,0 +1,259 @@
+' PlantUML diagrams for MogFinder screen flow & sequences
+' ファイル拡張子: .pu / .puml / .plantuml いずれでもOK
+' 使い方: https://plantuml.com/ja/
+
+'=============================
+' 1) 画面フロー（アクティビティ図）
+'=============================
+@startuml ScreenFlow
+skinparam dpi 220
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  StartColor #66B3FF
+  BarColor #888888
+  BackgroundColor #F8FAFC
+  BorderColor #93A1A1
+  ArrowColor #111111
+}
+
+start
+
+:幹事がMogFinderを開く;
+:グループ設定入力\n(場所/予算/ジャンル/人数);
+:グループURL/QRを発行;
+
+fork
+  :参加メンバーAがURL/QRでアクセス;
+  :チュートリアル(スワイプ説明);
+  :近場候補取得\n(位置情報 or 指定地点);
+  repeat
+    :スワイプ投票\n(いいね/良くないね/スキップ);
+  repeat while (候補残り>0 または 規定枚数未満?) is (Yes)
+  :投票完了;
+fork again
+  :参加メンバーBがURL/QRでアクセス;
+  :チュートリアル→候補取得→スワイプ投票;
+  :投票完了;
+fork again
+  :参加メンバーC... (同様);
+end fork
+
+:幹事(既定)が「投票終了」実行;
+:集計・スコアリング;
+:結果画面表示\n(TOP1推し+代替2件+地図+所要時間+スコア内訳);
+:「ここに決める」→共有リンク生成;
+stop
+
+@enduml
+
+
+'=================================
+' 2) シーケンス: グループ作成 & 共有
+'=================================
+@startuml Seq_GroupCreate
+skinparam dpi 220
+actor 幹事 as Organizer
+participant "Web/App\n(ブラウザ)" as App
+participant "Backend API" as API
+participant "Places API" as Places
+
+Organizer -> App: アクセス / 画面表示
+App -> API: POST /groups\n(場所/予算/ジャンル/人数)
+API -> Places: 近傍候補のプリフェッチ(任意)
+Places --> API: 候補(省略可)
+API --> App: room_id, invite_url, qr_image
+Organizer <- App: URL/QRを受領
+Organizer -> Organizer: LINE/Slack等で共有
+@enduml
+
+
+'=================================
+' 3) シーケンス: 参加 & スワイプ投票
+'=================================
+@startuml Seq_JoinVote
+skinparam dpi 220
+actor メンバー as Member
+participant "Web/App" as App
+participant "Backend API" as API
+participant "Places API" as Places
+
+Member -> App: 招待URL/QRでアクセス
+App -> API: GET /groups/{room_id}
+API --> App: グループメタ(中心点/条件)
+App -> API: GET /groups/{room_id}/candidates?cursor=
+API -> Places: 候補取得(キャッシュミス時)
+Places --> API: 候補一覧(20件)
+API --> App: 候補カード(ページネーション)
+
+loop カードをスワイプ
+  Member -> App: いいね/良くないね/スキップ
+  App -> API: POST /groups/{room_id}/vote\n{candidate_id, value}
+  API --> App: 200 OK
+  App -> API: GET /groups/{room_id}/candidates?cursor=
+  API --> App: 次のカード
+end
+
+Member -> App: 投票完了
+@enduml
+
+
+'==============================
+' 4) シーケンス: 終了 & 結果表示
+'==============================
+@startuml Seq_FinishResult
+skinparam dpi 220
+actor 幹事 as Organizer
+participant "Web/App" as App
+participant "Backend API" as API
+participant "Places API" as Places
+
+Organizer -> App: 終了ボタン押下
+App -> API: POST /groups/{room_id}/finish
+API -> API: 集計・スコアリング\nS=0.4*Like率 + 0.2*カバレッジ\n + 0.15*距離 + 0.1*営業時間適合\n + 0.1*価格適合 + 0.05*ジャンル適合
+API -> Places: 受賞候補の詳細(営業時間/レビュー)取得
+Places --> API: 詳細
+API --> App: GET /groups/{room_id}/results\n(TOP3, score_breakdown)
+App -> Organizer: 結果画面表示\n・推し(1位)\n・代替(2-3位)\n・地図/所要時間/価格帯\n・スコア内訳
+Organizer -> Organizer: 「ここに決める」で共有リンク発行
+@enduml
+
+
+'=============================
+' 5) 例: 状態遷移(オプション)
+'=============================
+@startuml State_Optional
+skinparam dpi 220
+skinparam backgroundColor #FFFFFF
+
+[*] --> GROUP_CREATED
+GROUP_CREATED : /groups 作成済\nURL/QR発行
+GROUP_CREATED --> VOTING_ACTIVE : 初回参加/投票開始
+VOTING_ACTIVE --> VOTING_ACTIVE : 参加者の投票が増える
+VOTING_ACTIVE --> AGGREGATING : 終了ボタン押下
+AGGREGATING --> DECIDED : 集計完了(TOP3計算)
+DECIDED --> [*]
+@enduml
+
+'===============================================
+' 6) 顧客ユーザ | システム（データ付きシーケンス）
+'===============================================
+@startuml Seq_UserSystem_All
+skinparam dpi 220
+skinparam sequenceParticipant underline
+hide footbox
+autonumber
+
+participant "顧客ユーザ" as User
+participant "システム" as System
+
+== グループ作成 ==
+User -> System: POST /groups\n(グループ作成)
+note right of System
+Request JSON (例)
+{
+  "center": {"lat": 35.6812, "lng": 139.7671},
+  "radius_m": 1200,
+  "budget": {"min": 800, "max": 2500},
+  "genres": ["居酒屋", "ラーメン"],
+  "expected_members": 5,
+  "expires_in_hours": 24
+}
+end note
+System --> User: 201 Created\nroom_id / invite_url / qr_image
+note right of User
+Response JSON (例)
+{
+  "room_id": "a7X9kd",
+  "invite_url": "https://mogf.app/g/a7X9kd",
+  "qr_image": "data:image/png;base64,....",
+  "created_at": "2025-10-18T14:55:00+09:00"
+}
+end note
+
+== 参加 & スワイプ投票 ==
+User -> System: GET /groups/{room_id}
+System --> User: 200 OK\n(グループメタ)
+note right of User
+{
+  "room_id": "a7X9kd",
+  "center": {"lat":35.6812, "lng":139.7671},
+  "radius_m": 1200,
+  "budget": {"min":800, "max":2500},
+  "genres": ["居酒屋", "ラーメン"],
+  "status": "VOTING_ACTIVE"
+}
+end note
+
+User -> System: GET /groups/{room_id}/candidates?cursor=\
+System --> User: 200 OK\n(候補カード 20件)
+note right of User
+{
+  "items": [
+    {
+      "candidate_id": "cand_01",
+      "place_id": "chIJVXtToz1uEmsR...",
+      "name": "居酒屋 はなれ",
+      "lat": 35.68, "lng": 139.77,
+      "price_level": 2,
+      "genres": ["居酒屋"],
+      "distance_m": 480,
+      "open_now": true
+    },
+    {"candidate_id": "cand_02", "name": "麺や つばさ", ...}
+  ],
+  "next_cursor": "eyJwYWdlIjoyfQ=="
+}
+end note
+
+loop スワイプごと
+  User -> System: POST /groups/{room_id}/vote
+  note right of System
+  Request JSON (例)
+  {"candidate_id": "cand_01", "value": 1, "anon_token": "u_9f3..."}
+  end note
+  System --> User: 200 OK
+  User -> System: GET /groups/{room_id}/candidates?cursor=eyJwYWdlIjoyfQ==
+  System --> User: 次のカード
+end
+
+== 終了 & 結果取得 ==
+User -> System: POST /groups/{room_id}/finish
+System -> System: 集計・スコアリング
+System --> User: 202 Accepted
+User -> System: GET /groups/{room_id}/results
+System --> User: 200 OK\n(TOP3 + スコア内訳)
+note right of User
+{
+  "top": [
+    { "rank": 1, "candidate_id": "cand_12", "name": "バル ルミエール",
+      "score": 0.86,
+      "score_breakdown": {
+        "like_ratio": 0.40,
+        "coverage": 0.18,
+        "distance": 0.12,
+        "open": 0.06,
+        "price": 0.06,
+        "genre": 0.04
+      },
+      "distance_m": 320,
+      "walk_minutes": 4,
+      "price_level": 2
+    },
+    { "rank": 2, "candidate_id": "cand_05", "name": "麺や つばさ", "score": 0.81 },
+    { "rank": 3, "candidate_id": "cand_01", "name": "居酒屋 はなれ", "score": 0.79 }
+  ],
+  "decided_at": "2025-10-18T15:07:12+09:00"
+}
+end note
+
+== 決定共有 ==
+User -> System: POST /groups/{room_id}/decide {"candidate_id":"cand_12"}
+System --> User: 200 OK\nshare_url
+note right of User
+{
+  "share_url": "https://mogf.app/g/a7X9kd/decided?c=cand_12"
+}
+end note
+
+@enduml
+
