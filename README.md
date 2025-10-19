@@ -23,6 +23,7 @@ MogFinder は、大学生などのグループが「今からご飯行こう！�
 ➡️ https://www.canva.com/design/DAG2LrCa7kY/-gg3PFwBtXY_ITIqijopOg/edit?  utm_content=DAG2LrCa7kY&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
 
 ## 🎥 デモ動画  
+➡️ https://img.youtube.com/vi/Kcumb8yQy6A/hqdefault.jpg)](https://youtube.com/shorts/Kcumb8yQy6A  
 [![Watch on YouTube](https://img.youtube.com/vi/Kcumb8yQy6A/hqdefault.jpg)](https://youtube.com/shorts/Kcumb8yQy6A)
 
 ---
