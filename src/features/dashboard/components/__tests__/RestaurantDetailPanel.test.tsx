@@ -41,9 +41,9 @@ describe('RestaurantDetailPanel', () => {
       />,
     );
 
-    expect(screen.getByText('店舗詳細')).toBeVisible();
     expect(screen.getByText('テスト居酒屋')).toBeVisible();
     expect(screen.getByText('最高でした')).toBeVisible();
+    expect(screen.getByText('電話する')).toBeVisible();
   });
 
   it('shows loading state', () => {
@@ -58,6 +58,6 @@ describe('RestaurantDetailPanel', () => {
       />,
     );
 
-    expect(screen.getByText('読み込み中です…')).toBeVisible();
+    expect(screen.getByText('詳細を読み込み中です…')).toBeVisible();
   });
 });
