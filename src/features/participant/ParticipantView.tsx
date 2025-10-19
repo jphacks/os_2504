@@ -1,15 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  AppBar,
+  Box,
+  Button,
+  CircularProgress,
+  FormControl,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Snackbar,
+  TextField,
+  Toolbar,
+  Typography,
+} from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { api } from '../../lib/api';
 import type { Member, RankingItem, Restaurant, RoomSummary } from '../../lib/types';
-import {
-  buttonCircleNegative,
-  buttonCirclePositive,
-  buttonMuted,
-  buttonPrimary,
-  buttonSecondary,
-} from '../../lib/ui';
 import type { StoredMemberSession } from '../../utils/session';
 import { loadParticipantSession, saveParticipantSession } from '../../utils/session';
+import RestaurantCard from '../../components/RestaurantCard';
+import SwipeArea from '../../components/SwipeArea';
+import SwipeButtons from '../../components/SwipeButtons';
+import MoguwanMascot from '../../components/MoguwanMascot';
+import AppContainer from '../../layout/AppContainer';
+import PhoneContainer from '../../layout/PhoneContainer';
+import MainContent from '../../layout/MainContent';
 
 type ParticipantStep = 'join' | 'voting' | 'finished';
 type StatusTone = 'info' | 'success' | 'error';
@@ -116,30 +134,6 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
     return () => window.clearInterval(timer);
   }, [room?.status, roomCode]);
 
-  useEffect(() => {
-    if (session) {
-      setSelectedMemberId(session.memberId);
-    }
-  }, [session]);
-
-  const refreshRoom = async () => {
-    try {
-      const result = await api<{ ok: boolean; data: RoomSummary & { qr: { text: string } } }>(`/api/rooms/${roomCode}`);
-      if (result.ok) {
-        setRoom({
-          room_code: roomCode,
-          room_name: result.data.room_name,
-          share_url: result.data.share_url,
-          status: result.data.status,
-          preparation: result.data.preparation,
-        });
-        showMessage('info', 'ルームの最新状態を取得しました。');
-      }
-    } catch (error) {
-      showMessage('error', (error as Error).message);
-    }
-  };
-
   const fetchRanking = useCallback(async () => {
     try {
       const result = await api<{ ok: boolean; data: RankingItem[] }>(`/api/rooms/${roomCode}/ranking`);
@@ -221,8 +215,6 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
         setStep('finished');
         await fetchRanking();
         showMessage('success', 'すべてのカードを評価しました。結果を確認してください。');
-      } else {
-        showMessage('info', '次のカードを評価してください。');
       }
     } catch (error) {
       showMessage('error', (error as Error).message);
@@ -313,23 +305,36 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF4C6] text-[#1D1B20] flex flex-col">
-      <ParticipantHeader roomCode={roomCode} roomName={room?.room_name ?? 'ルームに参加'} />
+    <AppContainer>
+      <PhoneContainer>
+        <AppBar position="sticky" elevation={0} sx={{ bgcolor: 'white', borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Toolbar>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
+              <Box
+                component="img"
+                src="/moguwan_icon.png"
+                alt="MoguFinder"
+                sx={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }}
+              />
+              <Typography variant="h6" component="div" sx={{ color: 'primary.main', fontWeight: 700 }}>
+                MoguFinder
+              </Typography>
+            </Box>
+            {step === 'voting' && (
+              <IconButton
+                onClick={() => startVoting()}
+                sx={{ color: 'primary.main', '&:hover': { bgcolor: 'primary.light', color: 'white' } }}
+              >
+                <RefreshIcon />
+              </IconButton>
+            )}
+          </Toolbar>
+        </AppBar>
 
-      {statusMessage && (
-        <StatusToast message={statusMessage} onClose={() => setStatusMessage(null)} />
-      )}
-
-      <main className="flex-1 w-full flex justify-center px-4 pb-24 pt-6">
-        <div className="w-full max-w-[420px] space-y-6">
-          <RoomStatusPanel
-            room={room}
-            isLoadingRoom={isLoadingRoom}
-            onRefresh={refreshRoom}
-          />
-
+        <MainContent>
           {step === 'join' && (
             <JoinScreen
+              room={room}
               members={members}
               selectedMemberId={selectedMemberId}
               onSelectMember={setSelectedMemberId}
@@ -342,19 +347,16 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
               onStartVoting={() => startVoting()}
               session={session}
               onLeaveSession={leaveSession}
-              roomStatus={room?.status ?? 'waiting'}
+              isLoadingRoom={isLoadingRoom}
             />
           )}
 
           {step === 'voting' && (
             <VoteScreen
-              roomName={room?.room_name ?? ''}
               currentCard={currentCard}
               answeredCount={answeredCount}
               totalCards={totalCards}
               onVote={handleVote}
-              onReload={() => startVoting()}
-              isFetchingCards={isFetchingCards}
               isSubmittingVote={isSubmittingVote}
             />
           )}
@@ -367,125 +369,25 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
               onRefreshRanking={fetchRanking}
             />
           )}
-        </div>
-      </main>
+        </MainContent>
 
-      <ParticipantFooter />
-    </div>
-  );
-}
-
-function ParticipantHeader({ roomCode, roomName }: { roomCode: string; roomName: string }) {
-  return (
-    <header className="bg-[#FFF4C6] shadow-[0_4px_12px_rgba(235,141,0,0.12)]">
-      <div className="mx-auto w-full max-w-[500px] px-4 pb-4">
-        <div className="relative flex h-[50px] items-center justify-center">
-          <h1 className="font-noto text-[30px] font-bold leading-none text-[#EB8D00]">いー幹事？</h1>
-          <span className="absolute right-0 text-[15px] font-bold text-[#EB8D00]">i-kanji?</span>
-        </div>
-        <div className="flex flex-col items-center gap-2">
-          <span className="text-[11px] font-bold text-[#5D5D5D]">参加中のルーム</span>
-          <p className="text-[20px] font-bold text-[#EB8D00]">{roomName}</p>
-          <div className="rounded-full bg-white/80 px-5 py-1 text-xs font-bold tracking-[0.32em] text-[#EB8D00]">
-            {roomCode}
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function ParticipantFooter() {
-  return (
-    <footer className="bg-[#242424] text-white">
-      <div className="mx-auto w-full max-w-[480px] px-9 py-6 space-y-2 text-[12px]">
-        <a href="#" className="block leading-[30px] hover:underline">
-          プライバシーポリシー
-        </a>
-        <a href="#" className="block leading-[30px] hover:underline">
-          利用規約
-        </a>
-        <p className="text-[#BCBCBC] text-[10px] leading-[30px] mt-2">@2025 E-kanji</p>
-      </div>
-    </footer>
-  );
-}
-
-function StatusToast({ message, onClose }: { message: StatusState; onClose: () => void }) {
-  const toneStyles: Record<StatusTone, string> = {
-    info: 'bg-[#FFE7DF] text-[#EB8D00]',
-    success: 'bg-[#CFF3D1] text-[#1C7C2D]',
-    error: 'bg-[#FFD1D1] text-[#B42318]',
-  };
-
-  return (
-    <div className="fixed top-24 left-1/2 z-40 w-full max-w-[360px] -translate-x-1/2 px-4">
-      <div
-        role="status"
-        className={`flex items-center justify-between gap-3 rounded-full px-5 py-3 text-sm font-bold shadow-[0_8px_16px_rgba(0,0,0,0.15)] ${toneStyles[message.tone]}`}
-      >
-        <span>{message.text}</span>
-        <button type="button" className="text-xs underline" onClick={onClose}>
-          閉じる
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function RoomStatusPanel({
-  room,
-  isLoadingRoom,
-  onRefresh,
-}: {
-  room: RoomSummary | null;
-  isLoadingRoom: boolean;
-  onRefresh: () => void;
-}) {
-  return (
-    <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_16px_32px_rgba(0,0,0,0.08)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-[18px] font-bold text-[#EB8D00]">ルーム状況</h2>
-          <p className="text-xs text-[#5D5D5D]">開催ステータスと進行度を確認しましょう。</p>
-        </div>
-        <button type="button" className={`${buttonMuted} px-4 py-1 text-xs`} onClick={onRefresh}>
-          再読み込み
-        </button>
-      </div>
-
-      {isLoadingRoom && <p className="mt-4 text-xs text-[#5D5D5D]">ルーム情報を読み込み中です…</p>}
-
-      {!isLoadingRoom && !room && (
-        <p className="mt-4 rounded-[16px] bg-[#FFD1D1] px-4 py-3 text-xs text-[#B42318]">
-          ルームが見つかりませんでした。URLが正しいか幹事に確認してください。
-        </p>
-      )}
-
-      {room && (
-        <div className="mt-6 space-y-4 text-sm text-[#1D1B20]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#5D5D5D]">ステータス</span>
-            <span className="text-sm font-bold text-[#EB8D00]">
-              {room.status === 'waiting' ? '候補を準備中' : '投票受付中'}
-            </span>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-[#5D5D5D]">準備状況</p>
-            <div className="mt-3 h-[8px] w-full rounded-full bg-[#FFD59A]">
-              <div className="h-full rounded-full bg-[#EB8D00]" style={{ width: `${room.preparation.progress}%` }} />
-            </div>
-            <p className="mt-2 text-xs text-[#5D5D5D]">
-              {room.preparation.preparedCount}/{room.preparation.expectedCount} 件の候補が準備済みです。
-            </p>
-          </div>
-        </div>
-      )}
-    </section>
+        <Snackbar
+          open={statusMessage !== null}
+          autoHideDuration={4000}
+          onClose={() => setStatusMessage(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setStatusMessage(null)} severity={statusMessage?.tone} sx={{ width: '100%' }}>
+            {statusMessage?.text}
+          </Alert>
+        </Snackbar>
+      </PhoneContainer>
+    </AppContainer>
   );
 }
 
 interface JoinScreenProps {
+  room: RoomSummary | null;
   members: Member[];
   selectedMemberId: string;
   onSelectMember: (value: string) => void;
@@ -498,10 +400,11 @@ interface JoinScreenProps {
   onStartVoting: () => void;
   session: StoredMemberSession | null;
   onLeaveSession: () => void;
-  roomStatus: RoomSummary['status'];
+  isLoadingRoom: boolean;
 }
 
 function JoinScreen({
+  room,
   members,
   selectedMemberId,
   onSelectMember,
@@ -514,252 +417,169 @@ function JoinScreen({
   onStartVoting,
   session,
   onLeaveSession,
-  roomStatus,
+  isLoadingRoom,
 }: JoinScreenProps) {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const selectedMember = members.find((member) => member.member_id === selectedMemberId) ?? null;
-  const disabledJoinExisting = !selectedMemberId || isJoining;
+  if (isLoadingRoom) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!room) {
+    return (
+      <Alert severity="error">
+        ルームが見つかりませんでした。URLが正しいか幹事に確認してください。
+      </Alert>
+    );
+  }
 
   return (
-    <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_16px_32px_rgba(0,0,0,0.08)]">
-      <header className="space-y-2 text-center">
-        <h2 className="text-[20px] font-bold text-[#EB8D00]">参加手続き</h2>
-        <p className="text-xs text-[#5D5D5D]">既存メンバーを選ぶか、新しい名前で参加しましょう。</p>
-      </header>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, color: 'primary.main', textAlign: 'center' }}>
+          {room.room_name}
+        </Typography>
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            ステータス: {room.status === 'waiting' ? '候補を準備中' : '投票受付中'}
+          </Typography>
+          <Box sx={{ mt: 1, height: 8, bgcolor: 'grey.200', borderRadius: 1, overflow: 'hidden' }}>
+            <Box sx={{ height: '100%', bgcolor: 'primary.main', width: `${room.preparation.progress}%`, transition: 'width 0.3s' }} />
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            {room.preparation.preparedCount}/{room.preparation.expectedCount} 件準備済み
+          </Typography>
+        </Box>
+      </Paper>
 
-      {roomStatus === 'waiting' && (
-        <p className="mt-5 rounded-[16px] bg-[#FFF4C6] px-4 py-3 text-xs text-[#5D5D5D]">
+      {room.status === 'waiting' && (
+        <Alert severity="info">
           現在候補を準備中です。投票開始まで少しお待ちください。
-        </p>
+        </Alert>
       )}
 
-      <div className="mt-6 space-y-4">
-        <div className="space-y-3">
-          <p className="text-[13px] text-[#5D5D5D]">ユーザを選択</p>
-          <div className="relative">
-            <button
-              type="button"
-              className={`flex h-[44px] w-full items-center justify-between rounded-[12px] border px-4 text-sm font-bold ${
-                selectedMember ? 'border-[#EB8D00] bg-[#FFF4C6] text-[#EB8D00]' : 'border-[#D9D9D9] bg-white text-[#5D5D5D]'
-              }`}
-              onClick={() => setIsDropdownOpen((prev) => !prev)}
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+          参加方法を選択
+        </Typography>
+
+        <Box sx={{ mt: 3 }}>
+          <FormControl fullWidth>
+            <InputLabel>既存メンバーを選択</InputLabel>
+            <Select
+              value={selectedMemberId}
+              onChange={(e) => onSelectMember(e.target.value)}
+              label="既存メンバーを選択"
             >
-              <span>{selectedMember?.member_name ?? 'メンバーを選択'}</span>
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
-              >
-                <path d="M6 9L12 15L18 9" stroke="#4A4459" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            {isDropdownOpen && (
-              <div className="absolute left-0 top-[calc(100%+4px)] z-20 w-full rounded-[12px] border border-[#FFD59A] bg-[#FFF9E0] shadow-xl">
-                <button
-                  type="button"
-                  className={`block w-full px-4 py-2 text-left text-sm ${
-                    !selectedMemberId ? 'font-bold text-[#EB8D00]' : 'text-[#333] hover:bg-[#FFE7DF]'
-                  }`}
-                  onClick={() => {
-                    onSelectMember('');
-                    setIsDropdownOpen(false);
-                  }}
-                >
-                  未選択
-                </button>
-                {members.map((member) => (
-                  <button
-                    key={member.member_id}
-                    type="button"
-                    className={`block w-full px-4 py-2 text-left text-sm hover:bg-[#FFE7DF] ${
-                      selectedMemberId === member.member_id ? 'font-bold text-[#EB8D00]' : 'text-[#333]'
-                    }`}
-                    onClick={() => {
-                      onSelectMember(member.member_id);
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    {member.member_name}
-                  </button>
-                ))}
-                {members.length === 0 && (
-                  <p className="px-4 py-3 text-[12px] text-[#5D5D5D]">まだメンバーが登録されていません。</p>
-                )}
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            className={`${buttonPrimary} w-full px-6 py-2 text-sm`}
+              <MenuItem value="">未選択</MenuItem>
+              {members.map((member) => (
+                <MenuItem key={member.member_id} value={member.member_id}>
+                  {member.member_name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            fullWidth
             onClick={onJoinExisting}
-            disabled={disabledJoinExisting}
+            disabled={!selectedMemberId || isJoining}
+            sx={{ mt: 2 }}
           >
             {isJoining ? '参加処理中…' : 'この名前で参加する'}
-          </button>
-        </div>
+          </Button>
+        </Box>
 
-        <div className="rounded-[18px] bg-[#FFF4C6] px-4 py-4">
-          <p className="text-[12px] font-bold text-[#5D5D5D]">または 新しい名前で参加</p>
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-            <input
+        <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            または 新しい名前で参加
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+            <TextField
               value={newMemberName}
-              onChange={(event) => onNewMemberNameChange(event.target.value)}
+              onChange={(e) => onNewMemberNameChange(e.target.value)}
               placeholder="ユーザ名"
-              className="h-[44px] flex-1 rounded-[12px] border border-[#D9D9D9] bg-white px-4 text-sm font-bold text-[#1D1B20] placeholder:text-[#ADADAD] focus:border-[#EB8D00] focus:outline-none"
+              fullWidth
             />
-            <button
-              type="button"
-              className={`${buttonSecondary} h-[44px] px-6 text-sm`}
+            <Button
+              variant="outlined"
               onClick={onJoinNew}
               disabled={isJoining || !newMemberName.trim()}
+              sx={{ minWidth: 100 }}
             >
-              {isJoining ? '登録中…' : '新しい名前で参加'}
-            </button>
-          </div>
-        </div>
+              {isJoining ? '登録中…' : '参加'}
+            </Button>
+          </Box>
+        </Box>
 
-        {session ? (
-          <div className="space-y-3 rounded-[18px] bg-[#E8F8ED] px-4 py-4 text-xs text-[#0F7A39]">
-            <p>
+        {session && (
+          <Box sx={{ mt: 3, p: 2, bgcolor: 'success.light', borderRadius: 2 }}>
+            <Typography variant="body2" color="success.dark" gutterBottom>
               現在 <strong>{session.memberName}</strong> として参加中です。
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button type="button" className={`${buttonMuted} px-4 py-2 text-xs`} onClick={onStartVoting}>
-                {canStartVoting ? 'カードを取得' : '準備ができたらカード取得'}
-              </button>
-              <button type="button" className={`${buttonSecondary} px-4 py-2 text-xs`} onClick={onLeaveSession}>
-                参加を終了
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className={`${buttonMuted} w-full px-6 py-2 text-sm`}
-            onClick={onStartVoting}
-            disabled={!canStartVoting}
-          >
-            {canStartVoting ? 'カードを取得' : '投票の準備が整ったら表示されます'}
-          </button>
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={onStartVoting}
+                disabled={!canStartVoting}
+                fullWidth
+              >
+                {canStartVoting ? 'カードを取得' : '準備中...'}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={onLeaveSession}
+                color="error"
+              >
+                終了
+              </Button>
+            </Box>
+          </Box>
         )}
-      </div>
-    </section>
+      </Paper>
+    </Box>
   );
 }
 
 interface VoteScreenProps {
-  roomName: string;
   currentCard: Restaurant | null;
   answeredCount: number;
   totalCards: number;
   onVote: (isLiked: boolean) => void;
-  onReload: () => void;
-  isFetchingCards: boolean;
   isSubmittingVote: boolean;
 }
 
 function VoteScreen({
-  roomName,
   currentCard,
   answeredCount,
   totalCards,
   onVote,
-  onReload,
-  isFetchingCards,
   isSubmittingVote,
 }: VoteScreenProps) {
-  const currentPosition = totalCards > 0 ? Math.min(answeredCount + 1, totalCards) : 0;
-
   return (
-    <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_16px_32px_rgba(0,0,0,0.08)]">
-      <header className="text-center">
-        <p className="text-xs font-bold text-[#5D5D5D]">{roomName}</p>
-        <h2 className="mt-2 text-[20px] font-bold text-[#EB8D00]">カードを評価</h2>
-        {totalCards > 0 && (
-          <p className="mt-1 text-xs text-[#5D5D5D]">
-            {currentPosition} / {totalCards}
-          </p>
-        )}
-        <button
-          type="button"
-          className={`${buttonMuted} mt-4 w-full px-6 py-2 text-sm`}
-          onClick={onReload}
-          disabled={isFetchingCards}
-        >
-          {isFetchingCards ? 'カードを再取得中…' : 'カードを再取得'}
-        </button>
-      </header>
-
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
       {currentCard ? (
-        <article className="mt-6 space-y-5">
-          <div className="overflow-hidden rounded-[24px] bg-[#FFF4C6] shadow-[0_12px_24px_rgba(0,0,0,0.12)]">
-            {currentCard.photo_urls[0] ? (
-              <img
-                src={currentCard.photo_urls[0]}
-                alt={currentCard.name}
-                className="h-[220px] w-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <div className="flex h-[220px] items-center justify-center text-sm text-[#5D5D5D]">
-                画像は準備中です
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-3 text-left">
-            <h3 className="text-[18px] font-bold text-[#1D1B20]">{currentCard.name}</h3>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#5D5D5D]">
-              <span className="rounded-full bg-[#FFE7DF] px-3 py-1 font-bold text-[#EB8D00]">
-                ★ {currentCard.rating.toFixed(1)}
-              </span>
-              <span>{currentCard.user_ratings_total} 件のレビュー</span>
-            </div>
-            {currentCard.summary_simple && (
-              <div className="rounded-[20px] border border-[#EB8D00]/30 bg-[#FFF4C6] px-4 py-3 text-[12px] leading-relaxed text-[#EB8D00]">
-                {currentCard.summary_simple}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-center gap-12 pt-2">
-            <button
-              type="button"
-              className={buttonCircleNegative}
-              onClick={() => onVote(false)}
-              disabled={isSubmittingVote}
-              aria-label="良くないね"
-            >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16.5 7.5L7.5 16.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-                <path d="M7.5 7.5L16.5 16.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className={buttonCirclePositive}
-              onClick={() => onVote(true)}
-              disabled={isSubmittingVote}
-              aria-label="いいね"
-            >
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M12 20.5C11.8333 20.5 11.6667 20.4542 11.5 20.3625C8.33333 18.475 6 16.6 4.5 14.7375C3 12.875 2.25 10.95 2.25 8.9625C2.25 7.5375 2.721 6.3375 3.663 5.3625C4.605 4.3875 5.775 3.9 7.173 3.9C8.005 3.9 8.773 4.1125 9.477 4.5375C10.181 4.9625 10.75 5.55 11.184 6.3H12.816C13.25 5.55 13.819 4.9625 14.523 4.5375C15.227 4.1125 15.995 3.9 16.827 3.9C18.225 3.9 19.395 4.3875 20.337 5.3625C21.279 6.3375 21.75 7.5375 21.75 8.9625C21.75 10.95 21 12.875 19.5 14.7375C18 16.6 15.6667 18.475 12.5 20.3625C12.3333 20.4542 12.1667 20.5 12 20.5Z"
-                  fill="currentColor"
-                />
-              </svg>
-            </button>
-          </div>
-        </article>
+        <>
+          <SwipeArea currentIndex={answeredCount} totalCount={totalCards}>
+            <RestaurantCard restaurant={currentCard} />
+          </SwipeArea>
+          <SwipeButtons
+            onDislike={() => onVote(false)}
+            onLike={() => onVote(true)}
+            disabled={isSubmittingVote}
+          />
+          <MoguwanMascot summary={currentCard.summary_simple} />
+        </>
       ) : (
-        <div className="mt-6 rounded-[18px] bg-[#FFF4C6] px-6 py-8 text-center text-sm text-[#5D5D5D]">
-          カードを準備しています。少し待ってから再取得をお試しください。
-        </div>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+          <CircularProgress />
+        </Box>
       )}
-    </section>
+    </Box>
   );
 }
 
@@ -772,43 +592,52 @@ interface ResultScreenProps {
 
 function ResultScreen({ ranking, onRestart, roomName, onRefreshRanking }: ResultScreenProps) {
   return (
-    <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_16px_32px_rgba(0,0,0,0.08)]">
-      <header className="space-y-2 text-center">
-        <h2 className="text-[20px] font-bold text-[#EB8D00]">暫定ランキング</h2>
-        <p className="text-sm font-bold text-[#1D1B20]">{roomName || 'ルーム名未設定'}</p>
-        <button type="button" className={`${buttonSecondary} w-full px-6 py-2 text-sm`} onClick={onRefreshRanking}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 3, textAlign: 'center' }}>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, color: 'primary.main' }}>
+          投票結果
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          {roomName || 'ルーム名未設定'}
+        </Typography>
+        <Button variant="outlined" onClick={onRefreshRanking} sx={{ mt: 2 }} fullWidth>
           ランキングを更新
-        </button>
-      </header>
+        </Button>
+      </Paper>
 
-      <div className="mt-6 space-y-4">
-        {ranking.map((item) => (
-          <div
-            key={item.place_id}
-            className="flex items-center justify-between rounded-[18px] bg-[#FFE7DF] px-5 py-4 shadow-[0_8px_18px_rgba(235,141,0,0.18)]"
-          >
-            <div>
-              <p className="text-[16px] font-bold text-[#EB8D00]">
-                {item.rank}位：{item.like_count}件
-              </p>
-              <p className="text-[18px] font-bold text-[#1D1B20]">{item.name}</p>
-              <p className="text-[11px] text-[#5D5D5D]">
-                良くないね {item.dislike_count} 件・★ {item.rating.toFixed(1)} / {item.user_ratings_total} 件
-              </p>
-            </div>
-            <span className="text-[11px] font-bold text-[#5D5D5D]">score: {item.score.toFixed(1)}</span>
-          </div>
-        ))}
-        {ranking.length === 0 && (
-          <p className="rounded-[18px] bg-[#FFF4C6] px-6 py-5 text-center text-sm text-[#5D5D5D]">
-            まだランキングがありません。幹事が集計を再実行するまでお待ちください。
-          </p>
-        )}
-      </div>
+      {ranking.length > 0 ? (
+        ranking.map((item) => (
+          <Paper key={item.place_id} elevation={2} sx={{ p: 2, borderRadius: 2, bgcolor: 'background.paper' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                  {item.rank}位
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  {item.name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  いいね {item.like_count} 件 • 良くないね {item.dislike_count} 件
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  ★ {item.rating.toFixed(1)} / {item.user_ratings_total} 件のレビュー
+                </Typography>
+              </Box>
+              <Typography variant="caption" color="text.secondary">
+                score: {item.score.toFixed(1)}
+              </Typography>
+            </Box>
+          </Paper>
+        ))
+      ) : (
+        <Alert severity="info">
+          まだランキングがありません。幹事が集計を再実行するまでお待ちください。
+        </Alert>
+      )}
 
-      <button type="button" className={`${buttonMuted} mt-6 w-full px-6 py-2 text-sm`} onClick={onRestart}>
+      <Button variant="contained" onClick={onRestart} fullWidth sx={{ mt: 2 }}>
         もう一度カードを取得
-      </button>
-    </section>
+      </Button>
+    </Box>
   );
 }

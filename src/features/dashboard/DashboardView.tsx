@@ -1,10 +1,35 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  AppBar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  FormControl,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Snackbar,
+  Tab,
+  Tabs,
+  TextField,
+  Toolbar,
+  Typography,
+} from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { api } from '../../lib/api';
 import type { Member, RankingItem, Restaurant, RoomSummary } from '../../lib/types';
-import { buttonMuted, buttonPrimary, buttonSecondary, panelClass } from '../../lib/ui';
-import { RestaurantCard } from './components/RestaurantCard';
-import { RestaurantDetailPanel } from './components/RestaurantDetailPanel';
-import { useRestaurantDetail } from './hooks/useRestaurantDetail';
+import AppContainer from '../../layout/AppContainer';
+import PhoneContainer from '../../layout/PhoneContainer';
+import MainContent from '../../layout/MainContent';
+import RestaurantCard from '../../components/RestaurantCard';
+import SwipeArea from '../../components/SwipeArea';
+import SwipeButtons from '../../components/SwipeButtons';
 
 const DEFAULT_SETTINGS = {
   latitude: 35.681236,
@@ -14,7 +39,7 @@ const DEFAULT_SETTINGS = {
   max_price_level: 4,
 };
 
-type OrganizerScene = 'landing' | 'setup' | 'share' | 'cards' | 'ranking';
+type OrganizerScene = 'setup' | 'share' | 'voting' | 'ranking';
 type StatusTone = 'info' | 'success' | 'error';
 
 interface StatusState {
@@ -23,46 +48,51 @@ interface StatusState {
 }
 
 export function DashboardView() {
-  const [scene, setScene] = useState<OrganizerScene>('landing');
+  const [scene, setScene] = useState<OrganizerScene>('setup');
   const [roomName, setRoomName] = useState('飲み会@神田');
   const [room, setRoom] = useState<RoomSummary | null>(null);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [members, setMembers] = useState<Member[]>([]);
   const [memberName, setMemberName] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [memberToken, setMemberToken] = useState<string | null>(null);
+  const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [ranking, setRanking] = useState<RankingItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<StatusState | null>(null);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isRefreshingRoom, setIsRefreshingRoom] = useState(false);
   const [isRefreshingMembers, setIsRefreshingMembers] = useState(false);
-  const [isIssuingToken, setIsIssuingToken] = useState(false);
   const [isFetchingCards, setIsFetchingCards] = useState(false);
   const [isFetchingRanking, setIsFetchingRanking] = useState(false);
+  const [memberToken, setMemberToken] = useState<string | null>(null);
   const dismissTimerRef = useRef<number | null>(null);
 
-  const {
-    selectedPlaceId,
-    detail: selectedDetail,
-    reviews: selectedReviews,
-    isLoading: isDetailLoading,
-    error: detailError,
-    loadDetail,
-    reset: resetDetail,
-  } = useRestaurantDetail();
+  const roomCode = room?.room_code;
+  const currentCard = restaurants[currentCardIndex] ?? null;
 
-  const roomCode = room?.room_code ?? null;
-  const hasRoom = Boolean(roomCode);
-  const hasMemberToken = Boolean(memberToken);
+  const showMessage = (tone: StatusTone, text: string) => {
+    setStatusMessage({ tone, text });
+    if (dismissTimerRef.current) {
+      window.clearTimeout(dismissTimerRef.current);
+    }
+    dismissTimerRef.current = window.setTimeout(() => setStatusMessage(null), 4000);
+  };
 
   useEffect(() => {
-    if (!roomCode || room?.status !== 'waiting') return;
+    return () => {
+      if (dismissTimerRef.current) {
+        window.clearTimeout(dismissTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (room?.status !== 'waiting') return;
     const timer = window.setInterval(async () => {
+      if (!roomCode) return;
       try {
-        const result = await api<{ ok: boolean; data: RoomSummary & { qr: { text: string } } }>(
-          `/api/rooms/${roomCode}`,
-        );
+        const result = await api<{ ok: boolean; data: RoomSummary & { qr: { text: string } } }>(`/api/rooms/${roomCode}`);
         if (result.ok) {
           setRoom({
             room_code: roomCode,
@@ -73,30 +103,11 @@ export function DashboardView() {
           });
         }
       } catch {
-        // polling errors can be ignored
+        // ignore polling errors
       }
     }, 2000);
-
-    return () => {
-      if (timer) window.clearInterval(timer);
-    };
-  }, [roomCode, room?.status]);
-
-  useEffect(() => {
-    return () => {
-      if (dismissTimerRef.current) {
-        window.clearTimeout(dismissTimerRef.current);
-      }
-    };
-  }, []);
-
-  const showMessage = (tone: StatusTone, text: string) => {
-    setStatusMessage({ tone, text });
-    if (dismissTimerRef.current) {
-      window.clearTimeout(dismissTimerRef.current);
-    }
-    dismissTimerRef.current = window.setTimeout(() => setStatusMessage(null), 4000);
-  };
+    return () => window.clearInterval(timer);
+  }, [room?.status, roomCode]);
 
   const handleCreateRoom = async () => {
     if (!roomName.trim()) {
@@ -112,9 +123,8 @@ export function DashboardView() {
       if (result.ok) {
         setRoom(result.data);
         setMembers([]);
-        setMemberToken(null);
         setSelectedMemberId(null);
-        await loadMembers({ roomCode: result.data.room_code, silent: true });
+        await loadMembers(result.data.room_code);
         setScene('share');
         showMessage('success', 'ルームを作成しました。共有画面で参加者を招待しましょう。');
       }
@@ -125,13 +135,135 @@ export function DashboardView() {
     }
   };
 
+  const loadMembers = async (code: string) => {
+    setIsRefreshingMembers(true);
+    try {
+      const result = await api<{ ok: boolean; data: Member[] }>(`/api/rooms/${code}/members`);
+      if (result.ok) {
+        setMembers(result.data);
+      }
+    } catch (error) {
+      showMessage('error', (error as Error).message);
+    } finally {
+      setIsRefreshingMembers(false);
+    }
+  };
+
+  const handleAddMember = async () => {
+    if (!roomCode || !memberName.trim()) {
+      showMessage('error', 'メンバー名を入力してください。');
+      return;
+    }
+    try {
+      const result = await api<{ ok: boolean; data: Member }>(`/api/rooms/${roomCode}/members`, {
+        method: 'POST',
+        body: JSON.stringify({ member_name: memberName.trim() }),
+      });
+      if (result.ok) {
+        setMembers((prev) => [...prev, result.data]);
+        setMemberName('');
+        showMessage('success', `${result.data.member_name} を追加しました。`);
+      }
+    } catch (error) {
+      showMessage('error', (error as Error).message);
+    }
+  };
+
+  const issueToken = async () => {
+    if (!roomCode || !selectedMemberId) {
+      showMessage('error', 'メンバーを選択してください。');
+      return;
+    }
+    try {
+      const result = await api<{ ok: boolean; data: { member_token: string } }>(
+        `/api/rooms/${roomCode}/members/${selectedMemberId}/session`,
+        { method: 'POST' },
+      );
+      if (result.ok) {
+        setMemberToken(result.data.member_token);
+        setActiveMemberId(selectedMemberId);
+        showMessage('success', '投票トークンを発行しました。');
+      }
+    } catch (error) {
+      showMessage('error', (error as Error).message);
+    }
+  };
+
+  const fetchRestaurants = async () => {
+    if (!roomCode || !memberToken) {
+      showMessage('error', '先にメンバーを選択してトークンを発行してください。');
+      return;
+    }
+    setIsFetchingCards(true);
+    try {
+      const result = await api<{ ok: boolean; data: { items: Restaurant[] } }>(
+        `/api/rooms/${roomCode}/restaurants`,
+        { headers: { Authorization: `Bearer ${memberToken}` } },
+      );
+      if (result.ok) {
+        setRestaurants(result.data.items);
+        setCurrentCardIndex(0);
+        if (result.data.items.length > 0) {
+          setScene('voting');
+          showMessage('info', 'カードを取得しました。評価を開始してください。');
+        } else {
+          showMessage('info', '表示できるカードがありません。');
+        }
+      }
+    } catch (error) {
+      showMessage('error', (error as Error).message);
+    } finally {
+      setIsFetchingCards(false);
+    }
+  };
+
+  const handleVote = async (isLiked: boolean) => {
+    if (!roomCode || !memberToken || !currentCard) return;
+    try {
+      await api(`/api/rooms/${roomCode}/likes`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${memberToken}` },
+        body: JSON.stringify({ place_id: currentCard.place_id, is_liked: isLiked }),
+      });
+      if (currentCardIndex < restaurants.length - 1) {
+        setCurrentCardIndex((prev) => prev + 1);
+      } else {
+        showMessage('success', 'すべてのカードを評価しました。');
+        setScene('ranking');
+        await fetchRanking();
+      }
+    } catch (error) {
+      showMessage('error', (error as Error).message);
+    }
+  };
+
+  const fetchRanking = async () => {
+    if (!roomCode) return;
+    setIsFetchingRanking(true);
+    try {
+      const result = await api<{ ok: boolean; data: RankingItem[] }>(`/api/rooms/${roomCode}/ranking`);
+      if (result.ok) {
+        setRanking(result.data);
+      }
+    } catch (error) {
+      showMessage('error', (error as Error).message);
+    } finally {
+      setIsFetchingRanking(false);
+    }
+  };
+
+  const copyShareUrl = () => {
+    if (room?.share_url) {
+      navigator.clipboard.writeText(room.share_url);
+      showMessage('success', '共有URLをコピーしました。');
+    }
+  };
+
   const refreshRoom = async () => {
     if (!roomCode) return;
     setIsRefreshingRoom(true);
     try {
-      const result = await api<{ ok: boolean; data: RoomSummary & { qr: { text: string } } }>(
-        `/api/rooms/${roomCode}`,
-      );
+      const result = await api<{ ok: boolean; data: RoomSummary & { qr: { text: string } } }>(`/api/rooms/${roomCode}`);
       if (result.ok) {
         setRoom({
           room_code: roomCode,
@@ -149,238 +281,45 @@ export function DashboardView() {
     }
   };
 
-  const loadMembers = async ({ roomCode: overrideRoomCode, silent = false }: { roomCode?: string; silent?: boolean } = {}) => {
-    const targetRoomCode = overrideRoomCode ?? roomCode;
-    if (!targetRoomCode) return;
-    setIsRefreshingMembers(true);
-    try {
-      const result = await api<{ ok: boolean; data: Member[] }>(`/api/rooms/${targetRoomCode}/members`);
-      if (result.ok) {
-        setMembers(result.data);
-        if (!selectedMemberId || !result.data.some((m) => m.member_id === selectedMemberId)) {
-          setSelectedMemberId(result.data[0]?.member_id ?? null);
-        }
-        if (!silent) {
-          showMessage('info', 'メンバー一覧を更新しました。');
-        }
-      }
-    } catch (error) {
-      showMessage('error', (error as Error).message);
-    } finally {
-      setIsRefreshingMembers(false);
-    }
-  };
-
-  const handleAddMember = async () => {
-    const trimmed = memberName.trim();
-    if (!roomCode) {
-      showMessage('info', 'メンバー追加の前にルームを作成してください。');
-      return;
-    }
-    if (!trimmed) {
-      showMessage('info', '名前を入力してください。');
-      return;
-    }
-    try {
-      await api(`/api/rooms/${roomCode}/members`, {
-        method: 'POST',
-        body: JSON.stringify({ member_name: trimmed }),
-      });
-      setMemberName('');
-      await loadMembers({ silent: true });
-      showMessage('success', 'メンバーを追加しました。');
-    } catch (error) {
-      showMessage('error', (error as Error).message);
-    }
-  };
-
-  const issueMemberSession = async () => {
-    if (!roomCode || !selectedMemberId) {
-      showMessage('info', '参加させたいメンバーを選択してください。');
-      return;
-    }
-    setIsIssuingToken(true);
-    try {
-      const result = await api<{ ok: boolean; data: { member_token: string; expires_in: number } }>(
-        `/api/rooms/${roomCode}/members/${selectedMemberId}/session`,
-        { method: 'POST' },
-      );
-      if (result.ok) {
-        setMemberToken(result.data.member_token);
-        setScene('cards');
-        showMessage('success', 'メンバー用の投票トークンを発行しました。カード画面に移動します。');
-      }
-    } catch (error) {
-      showMessage('error', (error as Error).message);
-    } finally {
-      setIsIssuingToken(false);
-    }
-  };
-
-  const fetchRestaurants = async () => {
-    if (!roomCode || !memberToken) {
-      showMessage('info', 'カード取得にはメンバーとしてログインする必要があります。');
-      return;
-    }
-    setIsFetchingCards(true);
-    try {
-      const result = await api<{ ok: boolean; data: { items: Restaurant[] } }>(
-        `/api/rooms/${roomCode}/restaurants`,
-        { headers: { Authorization: `Bearer ${memberToken}` } },
-      );
-      if (result.ok) {
-        setRestaurants(result.data.items);
-        if (result.data.items.length === 0) {
-          showMessage('info', '表示できるカードがまだありません。候補の準備が完了するとここに表示されます。');
-        } else {
-          showMessage('success', '最新の候補カードを取得しました。');
-        }
-      }
-    } catch (error) {
-      const err = error as Error & { status?: number };
-      if (err.status === 425) {
-        showMessage('info', '候補を準備中です。時間をおいて再取得してください。');
-      } else {
-        showMessage('error', err.message);
-      }
-    } finally {
-      setIsFetchingCards(false);
-    }
-  };
-
-  const sendVote = async (placeId: string, isLiked: boolean) => {
-    if (!roomCode || !memberToken) return;
-    try {
-      await api(`/api/rooms/${roomCode}/likes`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${memberToken}` },
-        body: JSON.stringify({ place_id: placeId, is_liked: isLiked }),
-      });
-      showMessage('success', isLiked ? 'いいねを記録しました。' : '良くないねを記録しました。');
-    } catch (error) {
-      showMessage('error', (error as Error).message);
-    }
-  };
-
-  const fetchRanking = async () => {
-    if (!roomCode) return;
-    setIsFetchingRanking(true);
-    try {
-      const result = await api<{ ok: boolean; data: RankingItem[] }>(`/api/rooms/${roomCode}/ranking`);
-      if (result.ok) {
-        setRanking(result.data);
-        showMessage('info', '最新のランキングを取得しました。');
-      }
-    } catch (error) {
-      showMessage('error', (error as Error).message);
-    } finally {
-      setIsFetchingRanking(false);
-    }
-  };
-
-  const copyShareUrl = async () => {
-    if (!room?.share_url) return;
-    try {
-      if (!navigator.clipboard?.writeText) {
-        throw new Error('クリップボードに対応していません。手動でコピーしてください。');
-      }
-      await navigator.clipboard.writeText(room.share_url);
-      showMessage('success', '共有URLをコピーしました。');
-    } catch (error) {
-      showMessage('error', (error as Error).message);
-    }
-  };
-
-  const openShareUrl = () => {
-    if (!room?.share_url) return;
-    window.open(room.share_url, '_blank', 'noopener,noreferrer');
-    showMessage('info', '別タブで共有URLを開きました。');
-  };
-
-  const handleNavigate = (next: OrganizerScene) => {
-    if (next === scene) return;
-    if (next === 'share' && !hasRoom) {
-      showMessage('info', 'まずはルームを作成してください。');
-      setScene('setup');
-      return;
-    }
-    if (next === 'cards' && !hasMemberToken) {
-      if (!hasRoom) {
-        showMessage('info', 'カードを確認する前にルームを作成してください。');
-        setScene('setup');
-      } else {
-        showMessage('info', '投票トークンを発行するとカードが取得できます。');
-        setScene('share');
-      }
-      return;
-    }
-    if (next === 'ranking' && !hasRoom) {
-      showMessage('info', 'まずはルームを作成してください。');
-      setScene('setup');
-      return;
-    }
-    setScene(next);
-  };
-
-  const beginFromLanding = () => {
-    if (hasRoom) {
-      setScene(hasMemberToken ? 'cards' : 'share');
-    } else {
-      setScene('setup');
-    }
-  };
-
-  const updateSettings = (patch: Partial<typeof DEFAULT_SETTINGS>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch };
-      let min = Math.max(0, Math.min(4, next.min_price_level));
-      let max = Math.max(0, Math.min(4, next.max_price_level));
-      if (min > max) {
-        if (patch.min_price_level !== undefined) {
-          max = min;
-        } else if (patch.max_price_level !== undefined) {
-          min = max;
-        } else {
-          [min, max] = [Math.min(min, max), Math.max(min, max)];
-        }
-      }
-      return { ...next, min_price_level: min, max_price_level: max };
-    });
-  };
-
-  const radiusLabel = `${settings.radius.toFixed(1)} km`;
-  const priceLabels = ['¥', '¥¥', '¥¥¥', '¥¥¥¥', '¥¥¥¥¥'];
-
   return (
-    <div className="min-h-screen bg-[#FFF4C6] text-[#1D1B20] flex flex-col">
-      <OrganizerHeader
-        scene={scene}
-        roomCode={roomCode}
-        hasRoom={hasRoom}
-        hasMemberToken={hasMemberToken}
-        onNavigate={handleNavigate}
-      />
+    <AppContainer>
+      <PhoneContainer>
+        <AppBar position="sticky" elevation={0} sx={{ bgcolor: 'white', borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Toolbar>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
+              <Box
+                component="img"
+                src="/moguwan_icon.png"
+                alt="MoguFinder"
+                sx={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }}
+              />
+              <Typography variant="h6" component="div" sx={{ color: 'primary.main', fontWeight: 700 }}>
+                MoguFinder - 幹事
+              </Typography>
+            </Box>
+          </Toolbar>
+          {room && (
+            <Tabs
+              value={scene}
+              onChange={(_, newValue) => setScene(newValue)}
+              sx={{ bgcolor: 'background.paper', borderTop: '1px solid', borderColor: 'divider' }}
+            >
+              <Tab label="共有" value="share" />
+              <Tab label="投票" value="voting" />
+              <Tab label="結果" value="ranking" />
+            </Tabs>
+          )}
+        </AppBar>
 
-      {statusMessage && (
-        <StatusToast message={statusMessage} onClose={() => setStatusMessage(null)} />
-      )}
-
-      <main className="flex-1 w-full flex justify-center px-4 pb-24 pt-6">
-        <div className="w-full max-w-[420px] space-y-8">
-          {scene === 'landing' && <LandingScreen onStart={beginFromLanding} />}
-
+        <MainContent>
           {scene === 'setup' && (
             <SetupScreen
               roomName={roomName}
               onRoomNameChange={setRoomName}
               settings={settings}
-              onUpdateSettings={updateSettings}
-              radiusLabel={radiusLabel}
-              priceLabels={priceLabels}
+              onSettingsChange={setSettings}
               onCreateRoom={handleCreateRoom}
-              isCreatingRoom={isCreatingRoom}
-              hasRoom={hasRoom}
-              room={room}
+              isCreating={isCreatingRoom}
             />
           )}
 
@@ -393,27 +332,25 @@ export function DashboardView() {
               onMemberNameChange={setMemberName}
               onSelectMember={setSelectedMemberId}
               onAddMember={handleAddMember}
-              onReloadMembers={loadMembers}
-              onIssueToken={issueMemberSession}
+              onIssueToken={issueToken}
               onCopyShareUrl={copyShareUrl}
-              onOpenShareUrl={openShareUrl}
               onRefreshRoom={refreshRoom}
-              isRefreshingMembers={isRefreshingMembers}
-              isIssuingToken={isIssuingToken}
+              onRefreshMembers={() => loadMembers(room.room_code)}
               isRefreshingRoom={isRefreshingRoom}
-              hasMemberToken={hasMemberToken}
+              isRefreshingMembers={isRefreshingMembers}
+              hasMemberToken={!!memberToken}
             />
           )}
 
-          {scene === 'cards' && (
-            <CardScreen
-              restaurants={restaurants}
-              onFetch={fetchRestaurants}
-              onLike={(placeId) => sendVote(placeId, true)}
-              onDislike={(placeId) => sendVote(placeId, false)}
-              onDetail={loadDetail}
+          {scene === 'voting' && (
+            <VotingScreen
+              currentCard={currentCard}
+              currentIndex={currentCardIndex}
+              totalCards={restaurants.length}
+              onVote={handleVote}
+              onFetchCards={fetchRestaurants}
               isFetching={isFetchingCards}
-              hasMemberToken={hasMemberToken}
+              hasMemberToken={!!memberToken}
             />
           )}
 
@@ -423,217 +360,22 @@ export function DashboardView() {
               onRefresh={fetchRanking}
               isRefreshing={isFetchingRanking}
               roomName={room?.room_name ?? ''}
-              members={members}
             />
           )}
-        </div>
-      </main>
+        </MainContent>
 
-      <OrganizerFooter />
-
-      <RestaurantDetailPanel
-        isOpen={Boolean(selectedPlaceId)}
-        isLoading={isDetailLoading}
-        error={detailError}
-        detail={selectedDetail}
-        reviews={selectedReviews}
-        onClose={resetDetail}
-      />
-    </div>
-  );
-}
-
-function OrganizerHeader({
-  scene,
-  roomCode,
-  hasRoom,
-  hasMemberToken,
-  onNavigate,
-}: {
-  scene: OrganizerScene;
-  roomCode: string | null;
-  hasRoom: boolean;
-  hasMemberToken: boolean;
-  onNavigate: (scene: OrganizerScene) => void;
-}) {
-  const navItems: Array<{ id: OrganizerScene; label: string; enabled: boolean }> = [
-    { id: 'landing', label: 'ホーム', enabled: true },
-    { id: 'setup', label: 'グループ作成', enabled: true },
-    { id: 'share', label: '共有', enabled: hasRoom },
-    { id: 'cards', label: 'カード', enabled: hasMemberToken },
-    { id: 'ranking', label: '結果', enabled: hasRoom },
-  ];
-
-  return (
-    <header className="bg-[#FFF4C6] shadow-[0_4px_16px_rgba(235,141,0,0.12)]">
-      <div className="mx-auto w-full max-w-[500px] px-4">
-        <div className="relative flex h-[50px] items-center justify-center">
-          <h1 className="font-noto text-[30px] font-bold leading-none text-[#EB8D00]">いー幹事？</h1>
-          <span className="absolute right-0 text-[15px] font-bold text-[#EB8D00]">i-kanji?</span>
-        </div>
-        {roomCode && (
-          <div className="flex flex-col items-center gap-1 pb-3">
-            <span className="font-ibm text-[10px] uppercase tracking-[0.28em] text-[#EB8D00]">ROOM CODE</span>
-            <span className="rounded-full bg-white/85 px-6 py-1 text-sm font-bold tracking-[0.35em] text-[#EB8D00]">
-              {roomCode}
-            </span>
-          </div>
-        )}
-        <nav className="flex flex-wrap items-center justify-center gap-2 pb-4">
-          {navItems.map((item) => {
-            const isActive = item.id === scene;
-            const isDisabled = !item.enabled;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={isActive}
-                aria-disabled={isDisabled}
-                className={`min-w-[90px] flex-1 rounded-[12px] border px-3 py-2 text-sm font-bold transition-colors duration-150 ${
-                  isActive
-                    ? 'border-[#EB8D00] bg-[#EB8D00] text-white shadow-[0_6px_12px_rgba(235,141,0,0.28)]'
-                    : 'border-[#FFD59A] bg-[#FFF9E0] text-[#EB8D00] hover:bg-[#FFE7DF]'
-                } ${isDisabled ? 'pointer-events-none opacity-40' : ''}`}
-                onClick={() => {
-                  if (!isDisabled) onNavigate(item.id);
-                }}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-    </header>
-  );
-}
-
-function OrganizerFooter() {
-  return (
-    <footer className="bg-[#242424] text-white">
-      <div className="mx-auto w-full max-w-[480px] px-9 py-6 space-y-2 text-[12px]">
-        <a href="#" className="block leading-[30px] hover:underline">
-          プライバシーポリシー
-        </a>
-        <a href="#" className="block leading-[30px] hover:underline">
-          利用規約
-        </a>
-        <p className="text-[#BCBCBC] text-[10px] leading-[30px] mt-2">@2025 E-kanji</p>
-      </div>
-    </footer>
-  );
-}
-
-function StatusToast({ message, onClose }: { message: StatusState; onClose: () => void }) {
-  const toneStyles: Record<StatusTone, string> = {
-    info: 'bg-[#FFE7DF] text-[#EB8D00]',
-    success: 'bg-[#CFF3D1] text-[#1C7C2D]',
-    error: 'bg-[#FFD1D1] text-[#B42318]',
-  };
-
-  return (
-    <div className="fixed top-24 left-1/2 z-40 w-full max-w-[360px] -translate-x-1/2 px-4">
-      <div
-        role="status"
-        className={`flex items-center justify-between gap-3 rounded-full px-5 py-3 text-sm font-bold shadow-[0_8px_16px_rgba(0,0,0,0.15)] ${toneStyles[message.tone]}`}
-      >
-        <span>{message.text}</span>
-        <button type="button" className="text-xs underline" onClick={onClose}>
-          閉じる
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function LandingScreen({ onStart }: { onStart: () => void }) {
-  return (
-    <div className="space-y-10 pb-16">
-      <section className={`${panelClass} bg-[#FFF9E0] p-8 text-center`}>
-        <div className="flex flex-col items-center gap-4">
-          <img
-            src="https://api.builder.io/api/v1/image/assets/TEMP/eb44c09ee8d6349b97ce397a77fd2c1ca978695e?width=314"
-            alt="サービスロゴ"
-            className="h-[140px] w-[140px] rounded-full object-cover"
-          />
-          <h2 className="text-[#EB8D00] text-[30px] font-bold leading-tight">「ここどうかな？」の負担はもうない。</h2>
-          <p className="text-base font-bold text-[#EB8D00] -mt-2">MoguMogu | モグモグ</p>
-        </div>
-        <p className="mt-8 text-[17px] leading-relaxed text-black">
-          「いー幹事？」は、グループでのお店探しをぐっとラクにする無料サービスです。みんなでカードをめくりながら最強のお店を決めましょう。
-        </p>
-        <button type="button" className={`${buttonPrimary} mt-8 px-10 py-2 text-lg`} onClick={onStart}>
-          はじめる
-        </button>
-      </section>
-
-      <section className="space-y-6">
-        <FeatureCard
-          title="1番簡単な投票方法"
-          caption="特徴その1"
-          description={
-            'スワイプによるYES / NO選択で、グループ全員の好みをスムーズに集められます。'
-          }
-        />
-        <FeatureCard
-          title="会員登録不要でかんたん利用"
-          caption="特徴その2"
-          description={'URLやQRコードを共有するだけで、誰でもすぐに参加できます。'}
-        />
-      </section>
-
-      <section className={`${panelClass} bg-white p-6`}>
-        <h3 className="text-[18px] font-bold text-center text-[#EB8D00]">1分でわかる「いー幹事？」の使い方</h3>
-        <ol className="mt-6 space-y-5 text-left">
-          <li className="rounded-[16px] bg-[#FFF4C6] p-4 shadow-sm">
-            <p className="text-xs font-bold text-[#EB8D00]">STEP 1</p>
-            <h4 className="mt-1 text-lg font-bold text-black">グループを作成する</h4>
-            <p className="mt-3 text-sm leading-relaxed text-[#333]">
-              イベントのタイトルと探したいお店の条件を設定します。半径や価格帯で候補の雰囲気を調整できます。
-            </p>
-          </li>
-          <li className="rounded-[16px] bg-[#FFF4C6] p-4 shadow-sm">
-            <p className="text-xs font-bold text-[#EB8D00]">STEP 2</p>
-            <h4 className="mt-1 text-lg font-bold text-black">URLとQRで共有する</h4>
-            <p className="mt-3 text-sm leading-relaxed text-[#333]">
-              発行されたシェアURLを友だちに配りましょう。URLが届けば、誰でもすぐに投票に参加できます。
-            </p>
-          </li>
-          <li className="rounded-[16px] bg-[#FFF4C6] p-4 shadow-sm">
-            <p className="text-xs font-bold text-[#EB8D00]">STEP 3</p>
-            <h4 className="mt-1 text-lg font-bold text-black">カードをめくって投票</h4>
-            <p className="mt-3 text-sm leading-relaxed text-[#333]">
-              YES / NO の2択でテンポ良く評価。気になるお店は詳細から雰囲気を確認できます。
-            </p>
-          </li>
-          <li className="rounded-[16px] bg-[#FFF4C6] p-4 shadow-sm">
-            <p className="text-xs font-bold text-[#EB8D00]">STEP 4</p>
-            <h4 className="mt-1 text-lg font-bold text-black">みんなで結果をチェック</h4>
-            <p className="mt-3 text-sm leading-relaxed text-[#333]">
-              集まった投票からランキングを自動算出。上位のお店を押さえて、最高の会をつくりましょう。
-            </p>
-          </li>
-        </ol>
-      </section>
-    </div>
-  );
-}
-
-function FeatureCard({
-  title,
-  caption,
-  description,
-}: {
-  title: string;
-  caption: string;
-  description: string;
-}) {
-  return (
-    <div className={`${panelClass} bg-[#FFE7DF] p-6 text-center`}>
-      <p className="text-[#EB8D00] text-sm font-bold">{caption}</p>
-      <h3 className="mt-2 text-lg font-bold text-black">{title}</h3>
-      <p className="mt-3 text-sm leading-relaxed text-[#4A4A4A]">{description}</p>
-    </div>
+        <Snackbar
+          open={statusMessage !== null}
+          autoHideDuration={4000}
+          onClose={() => setStatusMessage(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setStatusMessage(null)} severity={statusMessage?.tone} sx={{ width: '100%' }}>
+            {statusMessage?.text}
+          </Alert>
+        </Snackbar>
+      </PhoneContainer>
+    </AppContainer>
   );
 }
 
@@ -641,197 +383,104 @@ interface SetupScreenProps {
   roomName: string;
   onRoomNameChange: (value: string) => void;
   settings: typeof DEFAULT_SETTINGS;
-  onUpdateSettings: (patch: Partial<typeof DEFAULT_SETTINGS>) => void;
-  radiusLabel: string;
-  priceLabels: string[];
+  onSettingsChange: (settings: typeof DEFAULT_SETTINGS) => void;
   onCreateRoom: () => void;
-  isCreatingRoom: boolean;
-  hasRoom: boolean;
-  room: RoomSummary | null;
+  isCreating: boolean;
 }
 
 function SetupScreen({
   roomName,
   onRoomNameChange,
   settings,
-  onUpdateSettings,
-  radiusLabel,
-  priceLabels,
+  onSettingsChange,
   onCreateRoom,
-  isCreatingRoom,
-  hasRoom,
-  room,
+  isCreating,
 }: SetupScreenProps) {
-  const handleLatitudeChange = (value: string) => {
-    const next = Number(value);
-    if (!Number.isNaN(next)) {
-      onUpdateSettings({ latitude: next });
-    }
-  };
-
-  const handleLongitudeChange = (value: string) => {
-    const next = Number(value);
-  if (!Number.isNaN(next)) {
-    onUpdateSettings({ longitude: next });
-  }
-};
-
   return (
-    <div className="space-y-8 pb-16">
-      <section className="rounded-[24px] bg-white/95 px-6 py-8 shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
-        <header className="space-y-2 text-center">
-          <h2 className="text-[22px] font-bold text-[#EB8D00]">グループを作成</h2>
-          <p className="text-[13px] text-[#5D5D5D]">
-            イベント名と検索条件を決めて候補集めをスタートしましょう。
-          </p>
-        </header>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, color: 'primary.main', textAlign: 'center' }}>
+          新しいルームを作成
+        </Typography>
 
-        <div className="mt-8 space-y-8">
-          <div>
-            <h3 className="text-[15px] font-bold text-[#1D1B20]">グループ名</h3>
-            <div className="relative mt-5">
-              <input
-                value={roomName}
-                onChange={(event) => onRoomNameChange(event.target.value)}
-                placeholder="JPHACK打ち上げ など"
-                className="h-[44px] w-full bg-transparent px-[14px] text-[20px] font-bold text-[#1D1B20] placeholder:text-[#ADADAD] focus:outline-none"
-              />
-              <span className="absolute bottom-0 left-0 h-px w-full bg-[#D9D9D9]" />
-            </div>
-          </div>
+        <Box sx={{ mt: 3 }}>
+          <TextField
+            label="ルーム名"
+            value={roomName}
+            onChange={(e) => onRoomNameChange(e.target.value)}
+            fullWidth
+            sx={{ mb: 2 }}
+          />
 
-          <div className="rounded-[22px] bg-[#FFF4C6] p-6">
-            <div className="flex items-center gap-3">
-              <svg
-                width="27"
-                height="27"
-                viewBox="0 0 27 27"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
-              >
-                <path
-                  d="M13.5 24.75C11.5125 24.75 9.89062 24.4359 8.63437 23.8078C7.37812 23.1797 6.75 22.3688 6.75 21.375C6.75 20.7188 7.02188 20.1469 7.56563 19.6594C8.10938 19.1719 8.85938 18.7875 9.81562 18.5063L10.4625 20.6438C10.1438 20.7375 9.85312 20.8547 9.59062 20.9953C9.32812 21.1359 9.15 21.2625 9.05625 21.375C9.3 21.675 9.8625 21.9375 10.7437 22.1625C11.625 22.3875 12.5437 22.5 13.5 22.5C14.4563 22.5 15.3797 22.3875 16.2703 22.1625C17.1609 21.9375 17.7281 21.675 17.9719 21.375C17.8781 21.2625 17.7 21.1359 17.4375 20.9953C17.175 20.8547 16.8844 20.7375 16.5656 20.6438L17.2125 18.5063C18.1688 18.7875 18.9141 19.1719 19.4484 19.6594C19.9828 20.1469 20.25 20.7188 20.25 21.375C20.25 22.3688 19.6219 23.1797 18.3656 23.8078C17.1094 24.4359 15.4875 24.75 13.5 24.75ZM13.5 21.375C13.2937 21.375 13.1062 21.3141 12.9375 21.1922C12.7688 21.0703 12.6469 20.9062 12.5719 20.7C12.1406 19.3688 11.5969 18.2531 10.9406 17.3531C10.2844 16.4531 9.64687 15.5906 9.02813 14.7656C8.42813 13.9406 7.90781 13.0875 7.46719 12.2063C7.02656 11.325 6.80625 10.2375 6.80625 8.94375C6.80625 7.06875 7.45312 5.48438 8.74687 4.19063C10.0406 2.89688 11.625 2.25 13.5 2.25C15.375 2.25 16.9594 2.89688 18.2531 4.19063C19.5469 5.48438 20.1937 7.06875 20.1937 8.94375C20.1937 10.2375 19.9781 11.325 19.5469 12.2063C19.1156 13.0875 18.5906 13.9406 17.9719 14.7656C17.3719 15.5906 16.7391 16.4531 16.0734 17.3531C15.4078 18.2531 14.8594 19.3688 14.4281 20.7C14.3531 20.9062 14.2312 21.0703 14.0625 21.1922C13.8937 21.3141 13.7063 21.375 13.5 21.375ZM13.5 11.9063C14.575 11.9063 15.4977 11.5422 16.268 10.8141C17.0383 10.0859 17.4234 9.175 17.4234 8.08125C17.4234 6.9875 17.0383 6.07656 16.268 5.34844C15.4977 4.62031 14.575 4.25625 13.5 4.25625C12.425 4.25625 11.5023 4.62031 10.732 5.34844C9.96172 6.07656 9.57656 6.9875 9.57656 8.08125C9.57656 9.175 9.96172 10.0859 10.732 10.8141C11.5023 11.5422 12.425 11.9063 13.5 11.9063Z"
-                  fill="#EB8D00"
-                />
-              </svg>
-              <div>
-                <p className="text-[13px] font-bold text-[#1D1B20]">検索エリア</p>
-                <p className="text-[11px] text-[#5D5D5D]">中心位置と範囲を調整できます</p>
-              </div>
-            </div>
+          <TextField
+            label="緯度"
+            type="number"
+            value={settings.latitude}
+            onChange={(e) => onSettingsChange({ ...settings, latitude: parseFloat(e.target.value) })}
+            fullWidth
+            sx={{ mb: 2 }}
+          />
 
-            <div className="mt-4 grid grid-cols-2 gap-4">
-              <label className="flex flex-col gap-2 text-xs font-bold text-[#5D5D5D]">
-                緯度
-                <input
-                  type="number"
-                  value={settings.latitude}
-                  onChange={(event) => handleLatitudeChange(event.target.value)}
-                  className="h-[44px] rounded-[12px] border border-[#D9D9D9] bg-white px-3 text-sm font-bold text-[#1D1B20] focus:border-[#EB8D00] focus:outline-none"
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-xs font-bold text-[#5D5D5D]">
-                経度
-                <input
-                  type="number"
-                  value={settings.longitude}
-                  onChange={(event) => handleLongitudeChange(event.target.value)}
-                  className="h-[44px] rounded-[12px] border border-[#D9D9D9] bg-white px-3 text-sm font-bold text-[#1D1B20] focus:border-[#EB8D00] focus:outline-none"
-                />
-              </label>
-            </div>
-          </div>
+          <TextField
+            label="経度"
+            type="number"
+            value={settings.longitude}
+            onChange={(e) => onSettingsChange({ ...settings, longitude: parseFloat(e.target.value) })}
+            fullWidth
+            sx={{ mb: 2 }}
+          />
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs font-bold text-[#5D5D5D]">
-              <span>検索半径</span>
-              <span className="text-sm text-[#EB8D00]">{radiusLabel}</span>
-            </div>
-            <div className="relative h-[35px]">
-              <div className="absolute left-0 top-1/2 h-[5px] w-full -translate-y-1/2 rounded-full bg-[rgba(120,120,128,0.16)]" />
-              <div
-                className="absolute top-1/2 h-[5px] -translate-y-1/2 rounded-full bg-[#FFA9A9]"
-                style={{ width: `${((settings.radius - 0.5) / 4.5) * 100}%` }}
-              />
-              <input
-                type="range"
-                min="0.5"
-                max="5"
-                step="0.5"
-                value={settings.radius}
-                onChange={(event) => onUpdateSettings({ radius: Number(event.target.value) })}
-                className="absolute left-0 top-0 h-[35px] w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:h-[28px] [&::-webkit-slider-thumb]:w-[28px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-webkit-slider-track]:h-[5px] [&::-webkit-slider-track]:bg-transparent [&::-moz-range-thumb]:h-[28px] [&::-moz-range-thumb]:w-[28px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-moz-range-track]:h-[5px] [&::-moz-range-track]:bg-transparent"
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-[#5D5D5D]">
-              <span>0.5km</span>
-              <span>5.0km</span>
-            </div>
-          </div>
+          <TextField
+            label="検索半径 (km)"
+            type="number"
+            value={settings.radius}
+            onChange={(e) => onSettingsChange({ ...settings, radius: parseFloat(e.target.value) })}
+            fullWidth
+            sx={{ mb: 2 }}
+          />
 
-          <div className="space-y-3">
-            <p className="text-xs font-bold text-[#5D5D5D]">価格帯</p>
-            <div className="relative h-[35px]">
-              <div className="absolute left-0 top-1/2 h-[5px] w-full -translate-y-1/2 rounded-full bg-[rgba(120,120,128,0.16)]" />
-              <div
-                className="absolute top-1/2 h-[5px] -translate-y-1/2 rounded-full bg-[#FFA9A9]"
-                style={{
-                  left: `${(settings.min_price_level / 4) * 100}%`,
-                  width: `${Math.max(4, ((settings.max_price_level - settings.min_price_level) / 4) * 100)}%`,
-                }}
-              />
-              <input
-                type="range"
-                min="0"
-                max="4"
-                step="1"
-                value={settings.min_price_level}
-                onChange={(event) => onUpdateSettings({ min_price_level: Number(event.target.value) })}
-                className="absolute left-0 top-0 h-[35px] w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:h-[28px] [&::-webkit-slider-thumb]:w-[28px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-webkit-slider-track]:h-[5px] [&::-webkit-slider-track]:bg-transparent [&::-moz-range-thumb]:h-[28px] [&::-moz-range-thumb]:w-[28px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-moz-range-track]:h-[5px] [&::-moz-range-track]:bg-transparent"
-              />
-              <input
-                type="range"
-                min="0"
-                max="4"
-                step="1"
-                value={settings.max_price_level}
-                onChange={(event) => onUpdateSettings({ max_price_level: Number(event.target.value) })}
-                className="absolute left-0 top-0 h-[35px] w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:h-[28px] [&::-webkit-slider-thumb]:w-[28px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-webkit-slider-track]:h-[5px] [&::-webkit-slider-track]:bg-transparent [&::-moz-range-thumb]:h-[28px] [&::-moz-range-thumb]:w-[28px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-moz-range-track]:h-[5px] [&::-moz-range-track]:bg-transparent"
-              />
-            </div>
-            <div className="relative mt-2 h-4">
-              {priceLabels.map((label, index) => (
-                <span
-                  key={label}
-                  className="absolute -translate-x-1/2 text-[10px] text-[#5D5D5D]"
-                  style={{ left: `${(index / 4) * 100}%` }}
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>最小価格帯</InputLabel>
+            <Select
+              value={settings.min_price_level}
+              onChange={(e) => onSettingsChange({ ...settings, min_price_level: e.target.value as number })}
+              label="最小価格帯"
+            >
+              <MenuItem value={0}>0 (安い)</MenuItem>
+              <MenuItem value={1}>1</MenuItem>
+              <MenuItem value={2}>2</MenuItem>
+              <MenuItem value={3}>3</MenuItem>
+              <MenuItem value={4}>4 (高い)</MenuItem>
+            </Select>
+          </FormControl>
 
-        <div className="mt-10 space-y-4">
-          <button
-            type="button"
-            className={`${buttonPrimary} w-full px-6 py-3 text-lg shadow-[0_4px_12px_rgba(235,141,0,0.35)]`}
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>最大価格帯</InputLabel>
+            <Select
+              value={settings.max_price_level}
+              onChange={(e) => onSettingsChange({ ...settings, max_price_level: e.target.value as number })}
+              label="最大価格帯"
+            >
+              <MenuItem value={0}>0 (安い)</MenuItem>
+              <MenuItem value={1}>1</MenuItem>
+              <MenuItem value={2}>2</MenuItem>
+              <MenuItem value={3}>3</MenuItem>
+              <MenuItem value={4}>4 (高い)</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Button
+            variant="contained"
+            fullWidth
             onClick={onCreateRoom}
-            disabled={isCreatingRoom}
+            disabled={isCreating || !roomName.trim()}
+            size="large"
           >
-            {isCreatingRoom ? '作成中…' : 'ルームを作成'}
-          </button>
-
-          {hasRoom && room && (
-            <p className="rounded-[16px] bg-[#FFF4C6] px-4 py-3 text-xs text-[#5D5D5D]">
-              すでに <strong>{room.room_name}</strong> のルームが存在します。新しい設定で再作成する場合は上のボタンから更新してください。
-            </p>
-          )}
-        </div>
-      </section>
-    </div>
+            {isCreating ? 'ルーム作成中...' : 'ルームを作成'}
+          </Button>
+        </Box>
+      </Paper>
+    </Box>
   );
 }
 
@@ -843,14 +492,12 @@ interface ShareScreenProps {
   onMemberNameChange: (value: string) => void;
   onSelectMember: (value: string | null) => void;
   onAddMember: () => void;
-  onReloadMembers: () => void;
   onIssueToken: () => void;
   onCopyShareUrl: () => void;
-  onOpenShareUrl: () => void;
   onRefreshRoom: () => void;
-  isRefreshingMembers: boolean;
-  isIssuingToken: boolean;
+  onRefreshMembers: () => void;
   isRefreshingRoom: boolean;
+  isRefreshingMembers: boolean;
   hasMemberToken: boolean;
 }
 
@@ -862,240 +509,178 @@ function ShareScreen({
   onMemberNameChange,
   onSelectMember,
   onAddMember,
-  onReloadMembers,
   onIssueToken,
   onCopyShareUrl,
-  onOpenShareUrl,
   onRefreshRoom,
-  isRefreshingMembers,
-  isIssuingToken,
+  onRefreshMembers,
   isRefreshingRoom,
+  isRefreshingMembers,
   hasMemberToken,
 }: ShareScreenProps) {
-  const progress = room.preparation.progress;
-  const memberNames = members.map((member) => member.member_name).join('・') || 'まだメンバーが登録されていません';
-  const [isMemberPickerOpen, setIsMemberPickerOpen] = useState(false);
-  const activeMember = members.find((member) => member.member_id === selectedMemberId) ?? null;
-
   return (
-    <div className="space-y-8 pb-16">
-      <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
-        <header className="space-y-2 text-center">
-          <h2 className="text-[20px] font-bold text-[#EB8D00]">共有リンク</h2>
-          <p className="text-xs text-[#5D5D5D]">URLやQRを配ってメンバーを招待しましょう。</p>
-        </header>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, color: 'primary.main', textAlign: 'center' }}>
+          {room.room_name}
+        </Typography>
 
-        <div className="mt-6 space-y-4">
-          <div className="rounded-[18px] bg-[#FFF4C6] px-5 py-4 text-left text-sm text-[#1D1B20]">
-            <p className="text-[13px] font-bold text-[#EB8D00]">{room.room_name}</p>
-            <p className="mt-3 break-all text-[#333]">{room.share_url}</p>
-          </div>
+        <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 2 }}>
+          <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+            {room.share_url}
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<ContentCopyIcon />}
+            onClick={onCopyShareUrl}
+            fullWidth
+            sx={{ mt: 1 }}
+          >
+            URLをコピー
+          </Button>
+        </Box>
 
-          <div className="flex flex-wrap justify-center gap-3">
-            <button type="button" className={`${buttonPrimary} px-5 py-2 text-sm`} onClick={onCopyShareUrl}>
-              共有URLをコピー
-            </button>
-            <button type="button" className={`${buttonMuted} px-5 py-2 text-sm`} onClick={onOpenShareUrl}>
-              ブラウザで開く
-            </button>
-            <button
-              type="button"
-              className={`${buttonMuted} px-5 py-2 text-sm`}
-              onClick={onRefreshRoom}
-              disabled={isRefreshingRoom}
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            ステータス: {room.status === 'waiting' ? '候補を準備中' : '投票受付中'}
+          </Typography>
+          <Box sx={{ height: 8, bgcolor: 'grey.200', borderRadius: 1, overflow: 'hidden' }}>
+            <Box sx={{ height: '100%', bgcolor: 'primary.main', width: `${room.preparation.progress}%`, transition: 'width 0.3s' }} />
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            {room.preparation.preparedCount}/{room.preparation.expectedCount} 件準備済み
+          </Typography>
+        </Box>
+
+        <Button
+          variant="outlined"
+          startIcon={<RefreshIcon />}
+          onClick={onRefreshRoom}
+          disabled={isRefreshingRoom}
+          fullWidth
+          sx={{ mt: 2 }}
+        >
+          {isRefreshingRoom ? '更新中...' : 'ルーム情報更新'}
+        </Button>
+      </Paper>
+
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+          メンバー管理
+        </Typography>
+
+        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <TextField
+            value={memberName}
+            onChange={(e) => onMemberNameChange(e.target.value)}
+            placeholder="メンバー名"
+            fullWidth
+          />
+          <Button variant="contained" onClick={onAddMember} sx={{ minWidth: 100 }}>
+            追加
+          </Button>
+        </Box>
+
+        <Button
+          variant="outlined"
+          onClick={onRefreshMembers}
+          disabled={isRefreshingMembers}
+          fullWidth
+          size="small"
+        >
+          {isRefreshingMembers ? '更新中...' : 'メンバー一覧を更新'}
+        </Button>
+
+        <Box sx={{ mt: 2 }}>
+          <FormControl fullWidth>
+            <InputLabel>投票用メンバーを選択</InputLabel>
+            <Select
+              value={selectedMemberId ?? ''}
+              onChange={(e) => onSelectMember(e.target.value || null)}
+              label="投票用メンバーを選択"
             >
-              {isRefreshingRoom ? '更新中…' : 'ルーム情報更新'}
-            </button>
-          </div>
+              <MenuItem value="">未選択</MenuItem>
+              {members.map((member) => (
+                <MenuItem key={member.member_id} value={member.member_id}>
+                  {member.member_name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-          <div className="space-y-2">
-            <p className="text-xs font-bold text-[#5D5D5D]">準備状況</p>
-            <div className="h-[8px] w-full rounded-full bg-[#FFD59A]">
-              <div className="h-full rounded-full bg-[#EB8D00]" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="text-[11px] text-[#5D5D5D]">
-              {room.preparation.preparedCount}/{room.preparation.expectedCount} 件の候補を準備しています。
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-[18px] font-bold text-[#EB8D00]">メンバー管理</h3>
-            <p className="mt-1 text-[12px] text-[#5D5D5D]">登録済み: {memberNames}</p>
-          </div>
-          <button
-            type="button"
-            className={`${buttonMuted} px-4 py-1 text-xs`}
-            onClick={onReloadMembers}
-            disabled={isRefreshingMembers}
-          >
-            {isRefreshingMembers ? '更新中…' : '最新情報に更新'}
-          </button>
-        </header>
-
-        <div className="mt-5 space-y-5">
-          <div className="rounded-[18px] bg-[#FFF4C6] px-4 py-4">
-            <p className="text-[12px] font-bold text-[#5D5D5D]">メンバーを追加</p>
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-              <input
-                value={memberName}
-                onChange={(event) => onMemberNameChange(event.target.value)}
-                placeholder="名前を入力"
-                className="h-[44px] flex-1 rounded-[12px] border border-[#D9D9D9] bg-white px-4 text-sm font-bold text-[#1D1B20] placeholder:text-[#ADADAD] focus:border-[#EB8D00] focus:outline-none"
-              />
-              <button
-                type="button"
-                className={`${buttonPrimary} h-[44px] px-6 text-sm`}
-                onClick={onAddMember}
-                disabled={!memberName.trim()}
-              >
-                追加
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <p className="text-[12px] font-bold text-[#5D5D5D]">投票用メンバーを選択</p>
-            <div className="relative">
-              <button
-                type="button"
-                className={`flex h-[44px] w-full items-center justify-between rounded-[12px] border px-4 text-sm font-bold ${
-                  activeMember ? 'border-[#EB8D00] bg-[#FFF4C6] text-[#EB8D00]' : 'border-[#D9D9D9] bg-white text-[#5D5D5D]'
-                }`}
-                onClick={() => setIsMemberPickerOpen((prev) => !prev)}
-              >
-                <span>{activeMember?.member_name ?? 'メンバーを選択'}</span>
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className={`transition-transform ${isMemberPickerOpen ? 'rotate-180' : ''}`}
-                >
-                  <path d="M6 9L12 15L18 9" stroke="#4A4459" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-              {isMemberPickerOpen && (
-                <div className="absolute left-0 top-[calc(100%+4px)] z-20 w-full rounded-[12px] border border-[#FFD59A] bg-[#FFF9E0] shadow-xl">
-                  <button
-                    type="button"
-                    className={`block w-full px-4 py-2 text-left text-sm ${
-                      !selectedMemberId ? 'font-bold text-[#EB8D00]' : 'text-[#333] hover:bg-[#FFE7DF]'
-                    }`}
-                    onClick={() => {
-                      onSelectMember(null);
-                      setIsMemberPickerOpen(false);
-                    }}
-                  >
-                    未選択
-                  </button>
-                  {members.map((member) => (
-                    <button
-                      key={member.member_id}
-                      type="button"
-                      className={`block w-full px-4 py-2 text-left text-sm hover:bg-[#FFE7DF] ${
-                        selectedMemberId === member.member_id ? 'font-bold text-[#EB8D00]' : 'text-[#333]'
-                      }`}
-                      onClick={() => {
-                        onSelectMember(member.member_id);
-                        setIsMemberPickerOpen(false);
-                      }}
-                    >
-                      {member.member_name}
-                    </button>
-                  ))}
-                  {members.length === 0 && (
-                    <p className="px-4 py-3 text-[12px] text-[#5D5D5D]">まだメンバーが登録されていません。</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className={`${buttonSecondary} w-full px-6 py-3 text-lg`}
+          <Button
+            variant="contained"
             onClick={onIssueToken}
-            disabled={!selectedMemberId || isIssuingToken}
+            disabled={!selectedMemberId}
+            fullWidth
+            sx={{ mt: 2 }}
           >
-            {isIssuingToken ? '発行中…' : '投票トークンを発行'}
-          </button>
+            投票トークンを発行
+          </Button>
 
           {hasMemberToken && (
-            <p className="rounded-[16px] bg-[#E8F8ED] px-4 py-3 text-xs text-[#0F7A39]">
-              このブラウザに投票トークンを保存しました。カード画面に移動して動作を確認できます。
-            </p>
+            <Alert severity="success" sx={{ mt: 2 }}>
+              トークンを発行しました。投票タブからカードを取得できます。
+            </Alert>
           )}
-        </div>
-      </section>
-    </div>
+        </Box>
+      </Paper>
+    </Box>
   );
 }
 
-interface CardScreenProps {
-  restaurants: Restaurant[];
-  onFetch: () => void;
-  onLike: (placeId: string) => void;
-  onDislike: (placeId: string) => void;
-  onDetail: (placeId: string) => void;
+interface VotingScreenProps {
+  currentCard: Restaurant | null;
+  currentIndex: number;
+  totalCards: number;
+  onVote: (isLiked: boolean) => void;
+  onFetchCards: () => void;
   isFetching: boolean;
   hasMemberToken: boolean;
 }
 
-function CardScreen({
-  restaurants,
-  onFetch,
-  onLike,
-  onDislike,
-  onDetail,
+function VotingScreen({
+  currentCard,
+  currentIndex,
+  totalCards,
+  onVote,
+  onFetchCards,
   isFetching,
   hasMemberToken,
-}: CardScreenProps) {
+}: VotingScreenProps) {
   return (
-    <div className="space-y-8 pb-16">
-      <section className="rounded-[24px] bg-white/95 px-6 py-6 text-center shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
-        <h2 className="text-[20px] font-bold text-[#EB8D00]">候補カードをチェック</h2>
-        <p className="mt-2 text-xs text-[#5D5D5D]">
-          YES / NO の直感操作で、みんなのお気に入りを集めましょう。
-        </p>
-        <div className="mt-6 space-y-3">
-          <button
-            type="button"
-            className={`${buttonPrimary} w-full px-6 py-3 text-lg shadow-[0_4px_12px_rgba(235,141,0,0.28)]`}
-            onClick={onFetch}
-            disabled={isFetching || !hasMemberToken}
-          >
-            {isFetching ? 'カードを読み込み中…' : '最新のカードを取得'}
-          </button>
-          {!hasMemberToken && (
-            <p className="rounded-[16px] bg-[#FFF4C6] px-4 py-3 text-xs text-[#5D5D5D]">
-              まずはメンバーを選択して投票トークンを発行してください。
-            </p>
-          )}
-        </div>
-      </section>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {!hasMemberToken && (
+        <Alert severity="warning">
+          まずは共有タブでメンバーを選択して投票トークンを発行してください。
+        </Alert>
+      )}
 
-      <div className="space-y-8">
-        {restaurants.map((restaurant) => (
-          <RestaurantCard
-            key={restaurant.place_id}
-            restaurant={restaurant}
-            onLike={onLike}
-            onDislike={onDislike}
-            onDetail={onDetail}
+      <Button
+        variant="contained"
+        onClick={onFetchCards}
+        disabled={isFetching || !hasMemberToken}
+        fullWidth
+        size="large"
+      >
+        {isFetching ? 'カードを読み込み中...' : '最新のカードを取得'}
+      </Button>
+
+      {currentCard ? (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <SwipeArea currentIndex={currentIndex} totalCount={totalCards}>
+            <RestaurantCard restaurant={currentCard} />
+          </SwipeArea>
+          <SwipeButtons
+            onDislike={() => onVote(false)}
+            onLike={() => onVote(true)}
           />
-        ))}
-        {restaurants.length === 0 && (
-          <p className="rounded-[20px] bg-white/90 px-6 py-10 text-center text-sm text-[#5D5D5D] shadow-[0_12px_24px_rgba(0,0,0,0.1)]">
-            まだ表示できるカードがありません。候補の準備が完了したらこちらに並びます。
-          </p>
-        )}
-      </div>
-    </div>
+        </Box>
+      ) : totalCards > 0 ? (
+        <Alert severity="info">
+          すべてのカードを評価しました。
+        </Alert>
+      ) : null}
+    </Box>
   );
 }
 
@@ -1104,68 +689,60 @@ interface RankingScreenProps {
   onRefresh: () => void;
   isRefreshing: boolean;
   roomName: string;
-  members: Member[];
 }
 
-function RankingScreen({ ranking, onRefresh, isRefreshing, roomName, members }: RankingScreenProps) {
+function RankingScreen({ ranking, onRefresh, isRefreshing, roomName }: RankingScreenProps) {
   return (
-    <div className="space-y-8 pb-16">
-      <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
-        <header className="space-y-2 text-left">
-          <h2 className="text-[20px] font-bold text-[#EB8D00]">集計結果</h2>
-          <p className="text-sm font-bold text-[#1D1B20]">{roomName || 'グループ未指定'}</p>
-          <p className="text-[11px] text-[#5D5D5D]">
-            投票済みメンバー: {members.map((m) => m.member_name).join('・') || '未登録'}
-          </p>
-        </header>
-        <button
-          type="button"
-          className={`${buttonSecondary} mt-5 w-full px-6 py-3 text-sm`}
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 3, textAlign: 'center' }}>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, color: 'primary.main' }}>
+          投票結果
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          {roomName || 'ルーム名未設定'}
+        </Typography>
+        <Button
+          variant="outlined"
           onClick={onRefresh}
           disabled={isRefreshing}
+          fullWidth
+          sx={{ mt: 2 }}
         >
-          {isRefreshing ? '更新中…' : 'ランキングを更新'}
-        </button>
-      </section>
+          {isRefreshing ? '更新中...' : 'ランキングを更新'}
+        </Button>
+      </Paper>
 
-      <section className="space-y-4">
-        {ranking.map((item) => {
-          const mapsUrl = item.google_maps_url;
-          return (
-            <div
-              key={item.place_id}
-              className="flex items-center justify-between rounded-[20px] bg-[#FFE7DF] px-5 py-4 shadow-[0_8px_18px_rgba(235,141,0,0.18)]"
-            >
-              <div>
-                <p className="text-[16px] font-bold text-[#EB8D00]">
-                  {item.rank}位：{item.like_count}件
-                </p>
-                <p className="text-[18px] font-bold text-[#1D1B20]">{item.name}</p>
-                <p className="text-[11px] text-[#5D5D5D]">
-                  良くないね {item.dislike_count} 件・★ {item.rating.toFixed(1)} / {item.user_ratings_total} 件のレビュー
-                </p>
-              </div>
-              <button
-                type="button"
-                className={`${buttonMuted} px-4 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-40`}
-                onClick={() => {
-                  if (mapsUrl) {
-                    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
-                  }
-                }}
-                disabled={!mapsUrl}
-              >
-                地図を見る
-              </button>
-            </div>
-          );
-        })}
-        {ranking.length === 0 && (
-          <p className="rounded-[20px] bg-white/90 px-6 py-10 text-center text-sm text-[#5D5D5D] shadow-[0_12px_24px_rgba(0,0,0,0.1)]">
-            まだランキングがありません。投票が集まり次第、自動で表示されます。
-          </p>
-        )}
-      </section>
-    </div>
+      {ranking.length > 0 ? (
+        ranking.map((item) => (
+          <Card key={item.place_id} elevation={2}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                    {item.rank}位
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    {item.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    いいね {item.like_count} 件 • 良くないね {item.dislike_count} 件
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    ★ {item.rating.toFixed(1)} / {item.user_ratings_total} 件のレビュー
+                  </Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary">
+                  score: {item.score.toFixed(1)}
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        ))
+      ) : (
+        <Alert severity="info">
+          まだランキングがありません。
+        </Alert>
+      )}
+    </Box>
   );
 }
