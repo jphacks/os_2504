@@ -465,35 +465,43 @@ function OrganizerHeader({
   ];
 
   return (
-    <header className="bg-[#FFF4C6] border-b border-[#FFD59A]/50">
-      <div className="mx-auto w-full max-w-[480px] px-4 py-5 flex flex-col items-center gap-4">
-        <div className="flex flex-col items-center leading-none">
-          <h1 className="text-[#EB8D00] text-[30px] font-bold">いー幹事？</h1>
-          <span className="text-[#EB8D00] text-[15px] font-bold">i-kanji?</span>
+    <header className="bg-[#FFF4C6] shadow-[0_4px_16px_rgba(235,141,0,0.12)]">
+      <div className="mx-auto w-full max-w-[500px] px-4">
+        <div className="relative flex h-[50px] items-center justify-center">
+          <h1 className="font-noto text-[30px] font-bold leading-none text-[#EB8D00]">いー幹事？</h1>
+          <span className="absolute right-0 text-[15px] font-bold text-[#EB8D00]">i-kanji?</span>
         </div>
         {roomCode && (
-          <div className="text-center text-[#EB8D00] text-xs font-bold">
-            <p className="uppercase tracking-[0.2em]">ROOM CODE</p>
-            <p className="mt-1 text-base tracking-[0.35em]">{roomCode}</p>
+          <div className="flex flex-col items-center gap-1 pb-3">
+            <span className="font-ibm text-[10px] uppercase tracking-[0.28em] text-[#EB8D00]">ROOM CODE</span>
+            <span className="rounded-full bg-white/85 px-6 py-1 text-sm font-bold tracking-[0.35em] text-[#EB8D00]">
+              {roomCode}
+            </span>
           </div>
         )}
-        <nav className="flex flex-wrap justify-center gap-2">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`rounded-full px-4 py-1.5 text-sm font-bold shadow-sm transition-colors duration-150 ${
-                item.id === scene
-                  ? 'bg-[#EB8D00] text-white shadow-[0_6px_12px_rgba(235,141,0,0.3)]'
-                  : 'bg-white/80 text-[#EB8D00] border border-[#EB8D00]/60 hover:bg-[#FFE7DF]'
-              } ${
-                item.enabled ? '' : 'cursor-not-allowed opacity-40 hover:bg-white/80'
-              }`}
-              onClick={() => item.enabled && onNavigate(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
+        <nav className="flex flex-wrap items-center justify-center gap-2 pb-4">
+          {navItems.map((item) => {
+            const isActive = item.id === scene;
+            const isDisabled = !item.enabled;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={isActive}
+                aria-disabled={isDisabled}
+                className={`min-w-[90px] flex-1 rounded-[12px] border px-3 py-2 text-sm font-bold transition-colors duration-150 ${
+                  isActive
+                    ? 'border-[#EB8D00] bg-[#EB8D00] text-white shadow-[0_6px_12px_rgba(235,141,0,0.28)]'
+                    : 'border-[#FFD59A] bg-[#FFF9E0] text-[#EB8D00] hover:bg-[#FFE7DF]'
+                } ${isDisabled ? 'pointer-events-none opacity-40' : ''}`}
+                onClick={() => {
+                  if (!isDisabled) onNavigate(item.id);
+                }}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
       </div>
     </header>
@@ -663,81 +671,114 @@ function SetupScreen({
 
   const handleLongitudeChange = (value: string) => {
     const next = Number(value);
-    if (!Number.isNaN(next)) {
-      onUpdateSettings({ longitude: next });
-    }
-  };
+  if (!Number.isNaN(next)) {
+    onUpdateSettings({ longitude: next });
+  }
+};
 
   return (
-    <div className="space-y-6 pb-16">
-      <section className={`${panelClass} bg-white p-6 space-y-6`}>
-        <header className="text-center space-y-2">
-          <h2 className="text-[20px] font-bold text-[#EB8D00]">グループ作成</h2>
-          <p className="text-sm text-[#5D5D5D]">イベント名と検索条件を決めて候補の準備を始めましょう。</p>
+    <div className="space-y-8 pb-16">
+      <section className="rounded-[24px] bg-white/95 px-6 py-8 shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
+        <header className="space-y-2 text-center">
+          <h2 className="text-[22px] font-bold text-[#EB8D00]">グループを作成</h2>
+          <p className="text-[13px] text-[#5D5D5D]">
+            イベント名と検索条件を決めて候補集めをスタートしましょう。
+          </p>
         </header>
 
-        <div className="space-y-4 text-left">
+        <div className="mt-8 space-y-8">
           <div>
-            <label className="text-sm font-bold text-[#1D1B20]">グループ名</label>
-            <div className="mt-2 border-b border-[#D9D9D9]">
+            <h3 className="text-[15px] font-bold text-[#1D1B20]">グループ名</h3>
+            <div className="relative mt-5">
               <input
                 value={roomName}
                 onChange={(event) => onRoomNameChange(event.target.value)}
                 placeholder="JPHACK打ち上げ など"
-                className="w-full bg-transparent px-1 py-2 text-lg font-bold text-[#1D1B20] outline-none"
+                className="h-[44px] w-full bg-transparent px-[14px] text-[20px] font-bold text-[#1D1B20] placeholder:text-[#ADADAD] focus:outline-none"
               />
+              <span className="absolute bottom-0 left-0 h-px w-full bg-[#D9D9D9]" />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-[#5D5D5D]">緯度</label>
-              <input
-                type="number"
-                value={settings.latitude}
-                onChange={(event) => handleLatitudeChange(event.target.value)}
-                className="mt-1 w-full rounded-[10px] border border-[#D9D9D9] bg-[#FFF4C6] px-3 py-2 text-sm font-bold text-[#1D1B20]"
-              />
+          <div className="rounded-[22px] bg-[#FFF4C6] p-6">
+            <div className="flex items-center gap-3">
+              <svg
+                width="27"
+                height="27"
+                viewBox="0 0 27 27"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
+              >
+                <path
+                  d="M13.5 24.75C11.5125 24.75 9.89062 24.4359 8.63437 23.8078C7.37812 23.1797 6.75 22.3688 6.75 21.375C6.75 20.7188 7.02188 20.1469 7.56563 19.6594C8.10938 19.1719 8.85938 18.7875 9.81562 18.5063L10.4625 20.6438C10.1438 20.7375 9.85312 20.8547 9.59062 20.9953C9.32812 21.1359 9.15 21.2625 9.05625 21.375C9.3 21.675 9.8625 21.9375 10.7437 22.1625C11.625 22.3875 12.5437 22.5 13.5 22.5C14.4563 22.5 15.3797 22.3875 16.2703 22.1625C17.1609 21.9375 17.7281 21.675 17.9719 21.375C17.8781 21.2625 17.7 21.1359 17.4375 20.9953C17.175 20.8547 16.8844 20.7375 16.5656 20.6438L17.2125 18.5063C18.1688 18.7875 18.9141 19.1719 19.4484 19.6594C19.9828 20.1469 20.25 20.7188 20.25 21.375C20.25 22.3688 19.6219 23.1797 18.3656 23.8078C17.1094 24.4359 15.4875 24.75 13.5 24.75ZM13.5 21.375C13.2937 21.375 13.1062 21.3141 12.9375 21.1922C12.7688 21.0703 12.6469 20.9062 12.5719 20.7C12.1406 19.3688 11.5969 18.2531 10.9406 17.3531C10.2844 16.4531 9.64687 15.5906 9.02813 14.7656C8.42813 13.9406 7.90781 13.0875 7.46719 12.2063C7.02656 11.325 6.80625 10.2375 6.80625 8.94375C6.80625 7.06875 7.45312 5.48438 8.74687 4.19063C10.0406 2.89688 11.625 2.25 13.5 2.25C15.375 2.25 16.9594 2.89688 18.2531 4.19063C19.5469 5.48438 20.1937 7.06875 20.1937 8.94375C20.1937 10.2375 19.9781 11.325 19.5469 12.2063C19.1156 13.0875 18.5906 13.9406 17.9719 14.7656C17.3719 15.5906 16.7391 16.4531 16.0734 17.3531C15.4078 18.2531 14.8594 19.3688 14.4281 20.7C14.3531 20.9062 14.2312 21.0703 14.0625 21.1922C13.8937 21.3141 13.7063 21.375 13.5 21.375ZM13.5 11.9063C14.575 11.9063 15.4977 11.5422 16.268 10.8141C17.0383 10.0859 17.4234 9.175 17.4234 8.08125C17.4234 6.9875 17.0383 6.07656 16.268 5.34844C15.4977 4.62031 14.575 4.25625 13.5 4.25625C12.425 4.25625 11.5023 4.62031 10.732 5.34844C9.96172 6.07656 9.57656 6.9875 9.57656 8.08125C9.57656 9.175 9.96172 10.0859 10.732 10.8141C11.5023 11.5422 12.425 11.9063 13.5 11.9063Z"
+                  fill="#EB8D00"
+                />
+              </svg>
+              <div>
+                <p className="text-[13px] font-bold text-[#1D1B20]">検索エリア</p>
+                <p className="text-[11px] text-[#5D5D5D]">中心位置と範囲を調整できます</p>
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-bold text-[#5D5D5D]">経度</label>
-              <input
-                type="number"
-                value={settings.longitude}
-                onChange={(event) => handleLongitudeChange(event.target.value)}
-                className="mt-1 w-full rounded-[10px] border border-[#D9D9D9] bg-[#FFF4C6] px-3 py-2 text-sm font-bold text-[#1D1B20]"
-              />
+
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <label className="flex flex-col gap-2 text-xs font-bold text-[#5D5D5D]">
+                緯度
+                <input
+                  type="number"
+                  value={settings.latitude}
+                  onChange={(event) => handleLatitudeChange(event.target.value)}
+                  className="h-[44px] rounded-[12px] border border-[#D9D9D9] bg-white px-3 text-sm font-bold text-[#1D1B20] focus:border-[#EB8D00] focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-xs font-bold text-[#5D5D5D]">
+                経度
+                <input
+                  type="number"
+                  value={settings.longitude}
+                  onChange={(event) => handleLongitudeChange(event.target.value)}
+                  className="h-[44px] rounded-[12px] border border-[#D9D9D9] bg-white px-3 text-sm font-bold text-[#1D1B20] focus:border-[#EB8D00] focus:outline-none"
+                />
+              </label>
             </div>
           </div>
 
-          <div>
+          <div className="space-y-3">
             <div className="flex items-center justify-between text-xs font-bold text-[#5D5D5D]">
               <span>検索半径</span>
-              <span className="text-[#EB8D00] text-sm">{radiusLabel}</span>
+              <span className="text-sm text-[#EB8D00]">{radiusLabel}</span>
             </div>
-            <input
-              type="range"
-              min="0.5"
-              max="5"
-              step="0.5"
-              value={settings.radius}
-              onChange={(event) => onUpdateSettings({ radius: Number(event.target.value) })}
-              className="mt-3 h-[6px] w-full cursor-pointer appearance-none rounded-full bg-[#FFD59A] accent-[#EB8D00]"
-            />
-            <div className="mt-2 flex justify-between text-[10px] text-[#5D5D5D]">
+            <div className="relative h-[35px]">
+              <div className="absolute left-0 top-1/2 h-[5px] w-full -translate-y-1/2 rounded-full bg-[rgba(120,120,128,0.16)]" />
+              <div
+                className="absolute top-1/2 h-[5px] -translate-y-1/2 rounded-full bg-[#FFA9A9]"
+                style={{ width: `${((settings.radius - 0.5) / 4.5) * 100}%` }}
+              />
+              <input
+                type="range"
+                min="0.5"
+                max="5"
+                step="0.5"
+                value={settings.radius}
+                onChange={(event) => onUpdateSettings({ radius: Number(event.target.value) })}
+                className="absolute left-0 top-0 h-[35px] w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:h-[28px] [&::-webkit-slider-thumb]:w-[28px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-webkit-slider-track]:h-[5px] [&::-webkit-slider-track]:bg-transparent [&::-moz-range-thumb]:h-[28px] [&::-moz-range-thumb]:w-[28px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-moz-range-track]:h-[5px] [&::-moz-range-track]:bg-transparent"
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-[#5D5D5D]">
               <span>0.5km</span>
               <span>5.0km</span>
             </div>
           </div>
 
-          <div>
+          <div className="space-y-3">
             <p className="text-xs font-bold text-[#5D5D5D]">価格帯</p>
-            <div className="relative mt-4 h-[32px]">
+            <div className="relative h-[35px]">
+              <div className="absolute left-0 top-1/2 h-[5px] w-full -translate-y-1/2 rounded-full bg-[rgba(120,120,128,0.16)]" />
               <div
-                className="absolute top-1/2 h-[6px] -translate-y-1/2 rounded-full bg-[#FFA9A9]"
+                className="absolute top-1/2 h-[5px] -translate-y-1/2 rounded-full bg-[#FFA9A9]"
                 style={{
                   left: `${(settings.min_price_level / 4) * 100}%`,
-                  width: `${((settings.max_price_level - settings.min_price_level) / 4) * 100}%`,
+                  width: `${Math.max(4, ((settings.max_price_level - settings.min_price_level) / 4) * 100)}%`,
                 }}
               />
               <input
@@ -747,7 +788,7 @@ function SetupScreen({
                 step="1"
                 value={settings.min_price_level}
                 onChange={(event) => onUpdateSettings({ min_price_level: Number(event.target.value) })}
-                className="pointer-events-auto absolute left-0 top-0 h-[32px] w-full cursor-pointer appearance-none bg-transparent accent-white"
+                className="absolute left-0 top-0 h-[35px] w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:h-[28px] [&::-webkit-slider-thumb]:w-[28px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-webkit-slider-track]:h-[5px] [&::-webkit-slider-track]:bg-transparent [&::-moz-range-thumb]:h-[28px] [&::-moz-range-thumb]:w-[28px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-moz-range-track]:h-[5px] [&::-moz-range-track]:bg-transparent"
               />
               <input
                 type="range"
@@ -756,31 +797,39 @@ function SetupScreen({
                 step="1"
                 value={settings.max_price_level}
                 onChange={(event) => onUpdateSettings({ max_price_level: Number(event.target.value) })}
-                className="pointer-events-auto absolute left-0 top-0 h-[32px] w-full cursor-pointer appearance-none bg-transparent accent-white"
+                className="absolute left-0 top-0 h-[35px] w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:h-[28px] [&::-webkit-slider-thumb]:w-[28px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-webkit-slider-track]:h-[5px] [&::-webkit-slider-track]:bg-transparent [&::-moz-range-thumb]:h-[28px] [&::-moz-range-thumb]:w-[28px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-[0_0.5px_4px_rgba(0,0,0,0.12),0_6px_13px_rgba(0,0,0,0.12)] [&::-moz-range-track]:h-[5px] [&::-moz-range-track]:bg-transparent"
               />
             </div>
-            <div className="mt-2 flex justify-between text-[10px] text-[#5D5D5D]">
-              {priceLabels.map((label) => (
-                <span key={label}>{label}</span>
+            <div className="relative mt-2 h-4">
+              {priceLabels.map((label, index) => (
+                <span
+                  key={label}
+                  className="absolute -translate-x-1/2 text-[10px] text-[#5D5D5D]"
+                  style={{ left: `${(index / 4) * 100}%` }}
+                >
+                  {label}
+                </span>
               ))}
             </div>
           </div>
         </div>
 
-        <button
-          type="button"
-          className={`${buttonPrimary} w-full px-6 py-2 text-lg`}
-          onClick={onCreateRoom}
-          disabled={isCreatingRoom}
-        >
-          {isCreatingRoom ? '作成中…' : 'ルームを作成'}
-        </button>
+        <div className="mt-10 space-y-4">
+          <button
+            type="button"
+            className={`${buttonPrimary} w-full px-6 py-3 text-lg shadow-[0_4px_12px_rgba(235,141,0,0.35)]`}
+            onClick={onCreateRoom}
+            disabled={isCreatingRoom}
+          >
+            {isCreatingRoom ? '作成中…' : 'ルームを作成'}
+          </button>
 
-        {hasRoom && room && (
-          <p className="rounded-[12px] bg-[#FFF4C6] px-4 py-3 text-xs text-[#5D5D5D]">
-            すでに <strong>{room.room_name}</strong> のルームが作成されています。設定を変更したい場合は新しいルームを作成してください。
-          </p>
-        )}
+          {hasRoom && room && (
+            <p className="rounded-[16px] bg-[#FFF4C6] px-4 py-3 text-xs text-[#5D5D5D]">
+              すでに <strong>{room.room_name}</strong> のルームが存在します。新しい設定で再作成する場合は上のボタンから更新してください。
+            </p>
+          )}
+        </div>
       </section>
     </div>
   );
@@ -825,133 +874,163 @@ function ShareScreen({
 }: ShareScreenProps) {
   const progress = room.preparation.progress;
   const memberNames = members.map((member) => member.member_name).join('・') || 'まだメンバーが登録されていません';
+  const [isMemberPickerOpen, setIsMemberPickerOpen] = useState(false);
+  const activeMember = members.find((member) => member.member_id === selectedMemberId) ?? null;
 
   return (
-    <div className="space-y-6 pb-16">
-      <section className={`${panelClass} bg-white p-6 space-y-4`}>
-        <header className="text-center space-y-1">
+    <div className="space-y-8 pb-16">
+      <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
+        <header className="space-y-2 text-center">
           <h2 className="text-[20px] font-bold text-[#EB8D00]">共有リンク</h2>
-          <p className="text-sm text-[#5D5D5D]">URLを配ってメンバーを呼び込みましょう。QRコードにも対応しています。</p>
+          <p className="text-xs text-[#5D5D5D]">URLやQRを配ってメンバーを招待しましょう。</p>
         </header>
-        <div className="rounded-[14px] bg-[#FFF4C6] p-4 text-left text-sm text-[#1D1B20]">
-          <p className="font-bold text-[#EB8D00]">{room.room_name}</p>
-          <p className="mt-2 break-all text-[#333]">{room.share_url}</p>
-        </div>
-        <div className="flex flex-wrap justify-center gap-3">
-          <button type="button" className={`${buttonSecondary} px-4 py-1.5 text-sm`} onClick={onCopyShareUrl}>
-            コピー
-          </button>
-          <button type="button" className={`${buttonMuted} px-4 py-1.5 text-sm`} onClick={onOpenShareUrl}>
-            ブラウザで開く
-          </button>
-          <button
-            type="button"
-            className={`${buttonMuted} px-4 py-1.5 text-sm`}
-            onClick={onRefreshRoom}
-            disabled={isRefreshingRoom}
-          >
-            {isRefreshingRoom ? '更新中…' : 'ルーム更新'}
-          </button>
-        </div>
-        <div>
-          <p className="text-xs font-bold text-[#5D5D5D]">準備状況</p>
-          <div className="mt-2 h-2 w-full rounded-full bg-[#FFE7DF]">
-            <div className="h-full rounded-full bg-[#EB8D00]" style={{ width: `${progress}%` }} />
+
+        <div className="mt-6 space-y-4">
+          <div className="rounded-[18px] bg-[#FFF4C6] px-5 py-4 text-left text-sm text-[#1D1B20]">
+            <p className="text-[13px] font-bold text-[#EB8D00]">{room.room_name}</p>
+            <p className="mt-3 break-all text-[#333]">{room.share_url}</p>
           </div>
-          <p className="mt-2 text-xs text-[#5D5D5D]">
-            {room.preparation.preparedCount}/{room.preparation.expectedCount} 件の候補を準備中です。
-          </p>
+
+          <div className="flex flex-wrap justify-center gap-3">
+            <button type="button" className={`${buttonPrimary} px-5 py-2 text-sm`} onClick={onCopyShareUrl}>
+              共有URLをコピー
+            </button>
+            <button type="button" className={`${buttonMuted} px-5 py-2 text-sm`} onClick={onOpenShareUrl}>
+              ブラウザで開く
+            </button>
+            <button
+              type="button"
+              className={`${buttonMuted} px-5 py-2 text-sm`}
+              onClick={onRefreshRoom}
+              disabled={isRefreshingRoom}
+            >
+              {isRefreshingRoom ? '更新中…' : 'ルーム情報更新'}
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-[#5D5D5D]">準備状況</p>
+            <div className="h-[8px] w-full rounded-full bg-[#FFD59A]">
+              <div className="h-full rounded-full bg-[#EB8D00]" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="text-[11px] text-[#5D5D5D]">
+              {room.preparation.preparedCount}/{room.preparation.expectedCount} 件の候補を準備しています。
+            </p>
+          </div>
         </div>
       </section>
 
-      <section className={`${panelClass} bg-white p-6 space-y-5`}>
-        <header className="flex items-center justify-between">
+      <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
+        <header className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-[18px] font-bold text-[#EB8D00]">メンバー管理</h3>
-            <p className="text-xs text-[#5D5D5D]">登録済み: {memberNames}</p>
+            <p className="mt-1 text-[12px] text-[#5D5D5D]">登録済み: {memberNames}</p>
           </div>
           <button
             type="button"
-            className={`${buttonMuted} px-3 py-1 text-xs`}
+            className={`${buttonMuted} px-4 py-1 text-xs`}
             onClick={onReloadMembers}
             disabled={isRefreshingMembers}
           >
-            {isRefreshingMembers ? '更新中…' : '再取得'}
+            {isRefreshingMembers ? '更新中…' : '最新情報に更新'}
           </button>
         </header>
 
-        <div className="rounded-[16px] bg-[#FFF4C6] p-4">
-          <label className="text-xs font-bold text-[#5D5D5D]">メンバーを追加</label>
-          <div className="mt-2 flex items-center gap-3">
-            <input
-              value={memberName}
-              onChange={(event) => onMemberNameChange(event.target.value)}
-              placeholder="名前を入力"
-              className="flex-1 rounded-[10px] border border-[#D9D9D9] bg-white px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              className={`${buttonPrimary} px-4 py-2 text-sm`}
-              onClick={onAddMember}
-              disabled={!memberName.trim()}
-            >
-              追加
-            </button>
+        <div className="mt-5 space-y-5">
+          <div className="rounded-[18px] bg-[#FFF4C6] px-4 py-4">
+            <p className="text-[12px] font-bold text-[#5D5D5D]">メンバーを追加</p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+              <input
+                value={memberName}
+                onChange={(event) => onMemberNameChange(event.target.value)}
+                placeholder="名前を入力"
+                className="h-[44px] flex-1 rounded-[12px] border border-[#D9D9D9] bg-white px-4 text-sm font-bold text-[#1D1B20] placeholder:text-[#ADADAD] focus:border-[#EB8D00] focus:outline-none"
+              />
+              <button
+                type="button"
+                className={`${buttonPrimary} h-[44px] px-6 text-sm`}
+                onClick={onAddMember}
+                disabled={!memberName.trim()}
+              >
+                追加
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <p className="text-xs font-bold text-[#5D5D5D]">参加するメンバーを選択</p>
-          <div className="space-y-2">
-            <label
-              className={`flex items-center justify-between rounded-[14px] border px-4 py-2 text-sm ${
-                !selectedMemberId ? 'border-[#EB8D00] bg-[#FFF4C6] text-[#EB8D00]' : 'border-[#E4E4E4] bg-white text-[#333]'
-              }`}
-            >
-              <span>未選択</span>
-              <input type="radio" name="selected-member" checked={!selectedMemberId} onChange={() => onSelectMember(null)} />
-            </label>
-            {members.map((member) => {
-              const checked = selectedMemberId === member.member_id;
-              return (
-                <label
-                  key={member.member_id}
-                  className={`flex items-center justify-between rounded-[14px] border px-4 py-2 text-sm ${
-                    checked ? 'border-[#EB8D00] bg-[#FFF4C6] text-[#EB8D00]' : 'border-[#E4E4E4] bg-white text-[#333]'
-                  }`}
+          <div className="space-y-3">
+            <p className="text-[12px] font-bold text-[#5D5D5D]">投票用メンバーを選択</p>
+            <div className="relative">
+              <button
+                type="button"
+                className={`flex h-[44px] w-full items-center justify-between rounded-[12px] border px-4 text-sm font-bold ${
+                  activeMember ? 'border-[#EB8D00] bg-[#FFF4C6] text-[#EB8D00]' : 'border-[#D9D9D9] bg-white text-[#5D5D5D]'
+                }`}
+                onClick={() => setIsMemberPickerOpen((prev) => !prev)}
+              >
+                <span>{activeMember?.member_name ?? 'メンバーを選択'}</span>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className={`transition-transform ${isMemberPickerOpen ? 'rotate-180' : ''}`}
                 >
-                  <span>{member.member_name}</span>
-                  <input
-                    type="radio"
-                    name="selected-member"
-                    checked={checked}
-                    onChange={() => onSelectMember(member.member_id)}
-                  />
-                </label>
-              );
-            })}
-            {members.length === 0 && (
-              <p className="rounded-[12px] bg-[#FFF4C6] px-4 py-3 text-xs text-[#5D5D5D]">
-                まだメンバーが登録されていません。先に追加してから投票トークンを発行してください。
-              </p>
-            )}
+                  <path d="M6 9L12 15L18 9" stroke="#4A4459" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {isMemberPickerOpen && (
+                <div className="absolute left-0 top-[calc(100%+4px)] z-20 w-full rounded-[12px] border border-[#FFD59A] bg-[#FFF9E0] shadow-xl">
+                  <button
+                    type="button"
+                    className={`block w-full px-4 py-2 text-left text-sm ${
+                      !selectedMemberId ? 'font-bold text-[#EB8D00]' : 'text-[#333] hover:bg-[#FFE7DF]'
+                    }`}
+                    onClick={() => {
+                      onSelectMember(null);
+                      setIsMemberPickerOpen(false);
+                    }}
+                  >
+                    未選択
+                  </button>
+                  {members.map((member) => (
+                    <button
+                      key={member.member_id}
+                      type="button"
+                      className={`block w-full px-4 py-2 text-left text-sm hover:bg-[#FFE7DF] ${
+                        selectedMemberId === member.member_id ? 'font-bold text-[#EB8D00]' : 'text-[#333]'
+                      }`}
+                      onClick={() => {
+                        onSelectMember(member.member_id);
+                        setIsMemberPickerOpen(false);
+                      }}
+                    >
+                      {member.member_name}
+                    </button>
+                  ))}
+                  {members.length === 0 && (
+                    <p className="px-4 py-3 text-[12px] text-[#5D5D5D]">まだメンバーが登録されていません。</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+
+          <button
+            type="button"
+            className={`${buttonSecondary} w-full px-6 py-3 text-lg`}
+            onClick={onIssueToken}
+            disabled={!selectedMemberId || isIssuingToken}
+          >
+            {isIssuingToken ? '発行中…' : '投票トークンを発行'}
+          </button>
+
+          {hasMemberToken && (
+            <p className="rounded-[16px] bg-[#E8F8ED] px-4 py-3 text-xs text-[#0F7A39]">
+              このブラウザに投票トークンを保存しました。カード画面に移動して動作を確認できます。
+            </p>
+          )}
         </div>
-
-        <button
-          type="button"
-          className={`${buttonSecondary} w-full px-6 py-2 text-lg`}
-          onClick={onIssueToken}
-          disabled={!selectedMemberId || isIssuingToken}
-        >
-          {isIssuingToken ? '発行中…' : '投票トークンを発行'}
-        </button>
-
-        {hasMemberToken && (
-          <p className="rounded-[12px] bg-[#E8F8ED] px-4 py-3 text-xs text-[#0F7A39]">
-            このブラウザにメンバートークンが保存されました。カード画面から投票を体験できます。
-          </p>
-        )}
       </section>
     </div>
   );
@@ -977,28 +1056,30 @@ function CardScreen({
   hasMemberToken,
 }: CardScreenProps) {
   return (
-    <div className="space-y-6 pb-16">
-      <section className={`${panelClass} bg-white p-6 space-y-4`}>
-        <header className="text-center space-y-1">
-          <h2 className="text-[20px] font-bold text-[#EB8D00]">候補カード</h2>
-          <p className="text-sm text-[#5D5D5D]">YES / NO で評価しながら、みんなの好みを集めましょう。</p>
-        </header>
-        <button
-          type="button"
-          className={`${buttonPrimary} w-full px-6 py-2 text-lg`}
-          onClick={onFetch}
-          disabled={isFetching || !hasMemberToken}
-        >
-          {isFetching ? '取得中…' : 'カードを取得'}
-        </button>
-        {!hasMemberToken && (
-          <p className="rounded-[12px] bg-[#FFF4C6] px-4 py-3 text-xs text-[#5D5D5D]">
-            先にメンバーとして参加してトークンを発行するとカードを取得できます。
-          </p>
-        )}
+    <div className="space-y-8 pb-16">
+      <section className="rounded-[24px] bg-white/95 px-6 py-6 text-center shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
+        <h2 className="text-[20px] font-bold text-[#EB8D00]">候補カードをチェック</h2>
+        <p className="mt-2 text-xs text-[#5D5D5D]">
+          YES / NO の直感操作で、みんなのお気に入りを集めましょう。
+        </p>
+        <div className="mt-6 space-y-3">
+          <button
+            type="button"
+            className={`${buttonPrimary} w-full px-6 py-3 text-lg shadow-[0_4px_12px_rgba(235,141,0,0.28)]`}
+            onClick={onFetch}
+            disabled={isFetching || !hasMemberToken}
+          >
+            {isFetching ? 'カードを読み込み中…' : '最新のカードを取得'}
+          </button>
+          {!hasMemberToken && (
+            <p className="rounded-[16px] bg-[#FFF4C6] px-4 py-3 text-xs text-[#5D5D5D]">
+              まずはメンバーを選択して投票トークンを発行してください。
+            </p>
+          )}
+        </div>
       </section>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {restaurants.map((restaurant) => (
           <RestaurantCard
             key={restaurant.place_id}
@@ -1009,8 +1090,8 @@ function CardScreen({
           />
         ))}
         {restaurants.length === 0 && (
-          <p className="rounded-[16px] bg-white px-6 py-8 text-center text-sm text-[#5D5D5D] shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
-            カードがまだ表示されていません。候補の準備が完了するまで少しお待ちください。
+          <p className="rounded-[20px] bg-white/90 px-6 py-10 text-center text-sm text-[#5D5D5D] shadow-[0_12px_24px_rgba(0,0,0,0.1)]">
+            まだ表示できるカードがありません。候補の準備が完了したらこちらに並びます。
           </p>
         )}
       </div>
@@ -1028,16 +1109,18 @@ interface RankingScreenProps {
 
 function RankingScreen({ ranking, onRefresh, isRefreshing, roomName, members }: RankingScreenProps) {
   return (
-    <div className="space-y-6 pb-16">
-      <section className={`${panelClass} bg-white p-6 space-y-5`}>
+    <div className="space-y-8 pb-16">
+      <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
         <header className="space-y-2 text-left">
-          <h2 className="text-[20px] font-bold text-[#EB8D00]">最終候補</h2>
+          <h2 className="text-[20px] font-bold text-[#EB8D00]">集計結果</h2>
           <p className="text-sm font-bold text-[#1D1B20]">{roomName || 'グループ未指定'}</p>
-          <p className="text-xs text-[#5D5D5D]">投票済みメンバー: {members.map((m) => m.member_name).join('・') || '未登録'}</p>
+          <p className="text-[11px] text-[#5D5D5D]">
+            投票済みメンバー: {members.map((m) => m.member_name).join('・') || '未登録'}
+          </p>
         </header>
         <button
           type="button"
-          className={`${buttonSecondary} w-full px-6 py-2 text-sm`}
+          className={`${buttonSecondary} mt-5 w-full px-6 py-3 text-sm`}
           onClick={onRefresh}
           disabled={isRefreshing}
         >
@@ -1046,24 +1129,40 @@ function RankingScreen({ ranking, onRefresh, isRefreshing, roomName, members }: 
       </section>
 
       <section className="space-y-4">
-        {ranking.map((item) => (
-          <div
-            key={item.place_id}
-            className={`${panelClass} flex items-center justify-between bg-[#FFE7DF] px-5 py-3`}
-          >
-            <div>
-              <p className="text-sm font-bold text-[#EB8D00]">#{item.rank}</p>
-              <p className="text-lg font-bold text-black">{item.name}</p>
-              <p className="text-xs text-[#5D5D5D]">
-                いいね {item.like_count} / 良くないね {item.dislike_count} ・ ★ {item.rating.toFixed(1)}
-              </p>
+        {ranking.map((item) => {
+          const mapsUrl = item.google_maps_url;
+          return (
+            <div
+              key={item.place_id}
+              className="flex items-center justify-between rounded-[20px] bg-[#FFE7DF] px-5 py-4 shadow-[0_8px_18px_rgba(235,141,0,0.18)]"
+            >
+              <div>
+                <p className="text-[16px] font-bold text-[#EB8D00]">
+                  {item.rank}位：{item.like_count}件
+                </p>
+                <p className="text-[18px] font-bold text-[#1D1B20]">{item.name}</p>
+                <p className="text-[11px] text-[#5D5D5D]">
+                  良くないね {item.dislike_count} 件・★ {item.rating.toFixed(1)} / {item.user_ratings_total} 件のレビュー
+                </p>
+              </div>
+              <button
+                type="button"
+                className={`${buttonMuted} px-4 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-40`}
+                onClick={() => {
+                  if (mapsUrl) {
+                    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+                  }
+                }}
+                disabled={!mapsUrl}
+              >
+                地図を見る
+              </button>
             </div>
-            <span className="text-xs font-bold text-[#5D5D5D]">{item.user_ratings_total} 件</span>
-          </div>
-        ))}
+          );
+        })}
         {ranking.length === 0 && (
-          <p className="rounded-[16px] bg-white px-6 py-8 text-center text-sm text-[#5D5D5D] shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
-            まだランキングがありません。投票が集まるとここに結果が表示されます。
+          <p className="rounded-[20px] bg-white/90 px-6 py-10 text-center text-sm text-[#5D5D5D] shadow-[0_12px_24px_rgba(0,0,0,0.1)]">
+            まだランキングがありません。投票が集まり次第、自動で表示されます。
           </p>
         )}
       </section>

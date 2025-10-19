@@ -15,5 +15,5 @@
     "paths": {}
   },
   "include": ["src", "server", "db", "vite.config.ts", "vitest.config.ts"],
-  "exclude": ["ui_docs", "**/__tests__/**"]
+  "exclude": ["**/__tests__/**"]
 }

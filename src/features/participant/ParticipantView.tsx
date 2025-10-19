@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import type { Member, RankingItem, Restaurant, RoomSummary } from '../../lib/types';
-import { buttonDanger, buttonMuted, buttonPrimary, buttonSecondary, panelClass } from '../../lib/ui';
+import {
+  buttonCircleNegative,
+  buttonCirclePositive,
+  buttonMuted,
+  buttonPrimary,
+  buttonSecondary,
+} from '../../lib/ui';
 import type { StoredMemberSession } from '../../utils/session';
 import { loadParticipantSession, saveParticipantSession } from '../../utils/session';
 
@@ -371,13 +377,18 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
 
 function ParticipantHeader({ roomCode, roomName }: { roomCode: string; roomName: string }) {
   return (
-    <header className="bg-[#FFF4C6] border-b border-[#FFD59A]/50">
-      <div className="mx-auto w-full max-w-[480px] px-4 py-5 text-center">
-        <p className="text-xs uppercase tracking-[0.2em] text-[#5D5D5D]">参加中のルーム</p>
-        <h1 className="mt-2 text-[20px] font-bold text-[#EB8D00]">{roomName}</h1>
-        <div className="mt-3 inline-flex items-center justify-center gap-3 rounded-full bg-white/80 px-4 py-1 text-xs font-bold text-[#EB8D00]">
-          <span>ROOM CODE</span>
-          <span className="tracking-[0.35em]">{roomCode}</span>
+    <header className="bg-[#FFF4C6] shadow-[0_4px_12px_rgba(235,141,0,0.12)]">
+      <div className="mx-auto w-full max-w-[500px] px-4 pb-4">
+        <div className="relative flex h-[50px] items-center justify-center">
+          <h1 className="font-noto text-[30px] font-bold leading-none text-[#EB8D00]">いー幹事？</h1>
+          <span className="absolute right-0 text-[15px] font-bold text-[#EB8D00]">i-kanji?</span>
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-[11px] font-bold text-[#5D5D5D]">参加中のルーム</span>
+          <p className="text-[20px] font-bold text-[#EB8D00]">{roomName}</p>
+          <div className="rounded-full bg-white/80 px-5 py-1 text-xs font-bold tracking-[0.32em] text-[#EB8D00]">
+            {roomCode}
+          </div>
         </div>
       </div>
     </header>
@@ -432,37 +443,40 @@ function RoomStatusPanel({
   onRefresh: () => void;
 }) {
   return (
-    <section className={`${panelClass} bg-white p-6 space-y-4`}>
-      <div className="flex items-center justify-between">
+    <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_16px_32px_rgba(0,0,0,0.08)]">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-[18px] font-bold text-[#EB8D00]">ルーム状況</h2>
-          <p className="text-xs text-[#5D5D5D]">開催ステータスと準備状況を確認しましょう。</p>
+          <p className="text-xs text-[#5D5D5D]">開催ステータスと進行度を確認しましょう。</p>
         </div>
-        <button type="button" className={`${buttonMuted} px-3 py-1 text-xs`} onClick={onRefresh}>
+        <button type="button" className={`${buttonMuted} px-4 py-1 text-xs`} onClick={onRefresh}>
           再読み込み
         </button>
       </div>
-      {isLoadingRoom && <p className="text-xs text-[#5D5D5D]">ルーム情報を読み込み中です…</p>}
+
+      {isLoadingRoom && <p className="mt-4 text-xs text-[#5D5D5D]">ルーム情報を読み込み中です…</p>}
+
       {!isLoadingRoom && !room && (
-        <p className="rounded-[12px] bg-[#FFD1D1] px-4 py-3 text-xs text-[#B42318]">
+        <p className="mt-4 rounded-[16px] bg-[#FFD1D1] px-4 py-3 text-xs text-[#B42318]">
           ルームが見つかりませんでした。URLが正しいか幹事に確認してください。
         </p>
       )}
+
       {room && (
-        <div className="space-y-3 text-sm text-[#1D1B20]">
+        <div className="mt-6 space-y-4 text-sm text-[#1D1B20]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#5D5D5D]">ステータス</span>
             <span className="text-sm font-bold text-[#EB8D00]">
-              {room.status === 'waiting' ? '準備中' : '投票受付中'}
+              {room.status === 'waiting' ? '候補を準備中' : '投票受付中'}
             </span>
           </div>
           <div>
             <p className="text-xs font-bold text-[#5D5D5D]">準備状況</p>
-            <div className="mt-2 h-2 w-full rounded-full bg-[#FFE7DF]">
+            <div className="mt-3 h-[8px] w-full rounded-full bg-[#FFD59A]">
               <div className="h-full rounded-full bg-[#EB8D00]" style={{ width: `${room.preparation.progress}%` }} />
             </div>
             <p className="mt-2 text-xs text-[#5D5D5D]">
-              {room.preparation.preparedCount}/{room.preparation.expectedCount} 件の候補を準備中です。
+              {room.preparation.preparedCount}/{room.preparation.expectedCount} 件の候補が準備済みです。
             </p>
           </div>
         </div>
@@ -502,83 +516,134 @@ function JoinScreen({
   onLeaveSession,
   roomStatus,
 }: JoinScreenProps) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const selectedMember = members.find((member) => member.member_id === selectedMemberId) ?? null;
+  const disabledJoinExisting = !selectedMemberId || isJoining;
+
   return (
-    <section className={`${panelClass} bg-white p-6 space-y-6`}>
+    <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_16px_32px_rgba(0,0,0,0.08)]">
       <header className="space-y-2 text-center">
         <h2 className="text-[20px] font-bold text-[#EB8D00]">参加手続き</h2>
-        <p className="text-xs text-[#5D5D5D]">既存メンバーを選ぶか、新しく名前を登録して投票を始めましょう。</p>
+        <p className="text-xs text-[#5D5D5D]">既存メンバーを選ぶか、新しい名前で参加しましょう。</p>
       </header>
 
       {roomStatus === 'waiting' && (
-        <p className="rounded-[12px] bg-[#FFF4C6] px-4 py-3 text-xs text-[#5D5D5D]">
+        <p className="mt-5 rounded-[16px] bg-[#FFF4C6] px-4 py-3 text-xs text-[#5D5D5D]">
           現在候補を準備中です。投票開始まで少しお待ちください。
         </p>
       )}
 
-      <div className="space-y-3">
-        <label className="text-xs font-bold text-[#5D5D5D]" htmlFor="existing-member">
-          既存メンバーで参加
-        </label>
-        <select
-          id="existing-member"
-          value={selectedMemberId}
-          onChange={(event) => onSelectMember(event.target.value)}
-          className="w-full rounded-[12px] border border-[#D9D9D9] bg-[#FFF4C6] px-3 py-2 text-sm font-bold text-[#1D1B20]"
-        >
-          <option value="">未選択</option>
-          {members.map((member) => (
-            <option key={member.member_id} value={member.member_id}>
-              {member.member_name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className={`${buttonPrimary} w-full px-6 py-2 text-lg`}
-          onClick={onJoinExisting}
-          disabled={!selectedMemberId || isJoining}
-        >
-          {isJoining ? '処理中…' : '選択したメンバーで参加'}
-        </button>
-      </div>
+      <div className="mt-6 space-y-4">
+        <div className="space-y-3">
+          <p className="text-[13px] text-[#5D5D5D]">ユーザを選択</p>
+          <div className="relative">
+            <button
+              type="button"
+              className={`flex h-[44px] w-full items-center justify-between rounded-[12px] border px-4 text-sm font-bold ${
+                selectedMember ? 'border-[#EB8D00] bg-[#FFF4C6] text-[#EB8D00]' : 'border-[#D9D9D9] bg-white text-[#5D5D5D]'
+              }`}
+              onClick={() => setIsDropdownOpen((prev) => !prev)}
+            >
+              <span>{selectedMember?.member_name ?? 'メンバーを選択'}</span>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
+              >
+                <path d="M6 9L12 15L18 9" stroke="#4A4459" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            {isDropdownOpen && (
+              <div className="absolute left-0 top-[calc(100%+4px)] z-20 w-full rounded-[12px] border border-[#FFD59A] bg-[#FFF9E0] shadow-xl">
+                <button
+                  type="button"
+                  className={`block w-full px-4 py-2 text-left text-sm ${
+                    !selectedMemberId ? 'font-bold text-[#EB8D00]' : 'text-[#333] hover:bg-[#FFE7DF]'
+                  }`}
+                  onClick={() => {
+                    onSelectMember('');
+                    setIsDropdownOpen(false);
+                  }}
+                >
+                  未選択
+                </button>
+                {members.map((member) => (
+                  <button
+                    key={member.member_id}
+                    type="button"
+                    className={`block w-full px-4 py-2 text-left text-sm hover:bg-[#FFE7DF] ${
+                      selectedMemberId === member.member_id ? 'font-bold text-[#EB8D00]' : 'text-[#333]'
+                    }`}
+                    onClick={() => {
+                      onSelectMember(member.member_id);
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    {member.member_name}
+                  </button>
+                ))}
+                {members.length === 0 && (
+                  <p className="px-4 py-3 text-[12px] text-[#5D5D5D]">まだメンバーが登録されていません。</p>
+                )}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className={`${buttonPrimary} w-full px-6 py-2 text-sm`}
+            onClick={onJoinExisting}
+            disabled={disabledJoinExisting}
+          >
+            {isJoining ? '参加処理中…' : 'この名前で参加する'}
+          </button>
+        </div>
 
-      <div className="space-y-3">
-        <label className="text-xs font-bold text-[#5D5D5D]" htmlFor="new-member-name">
-          新しく名前を登録
-        </label>
-        <input
-          id="new-member-name"
-          value={newMemberName}
-          onChange={(event) => onNewMemberNameChange(event.target.value)}
-          placeholder="例: さき"
-          className="w-full rounded-[12px] border border-[#D9D9D9] bg-[#FFF4C6] px-3 py-2 text-sm"
-        />
-        <button
-          type="button"
-          className={`${buttonMuted} w-full px-6 py-2 text-lg`}
-          onClick={onJoinNew}
-          disabled={isJoining}
-        >
-          {isJoining ? '登録中…' : '登録して参加'}
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        <button
-          type="button"
-          className={`${buttonSecondary} w-full px-6 py-2 text-lg`}
-          onClick={onStartVoting}
-          disabled={!canStartVoting}
-        >
-          カードを取得
-        </button>
-        {session && (
-          <div className="rounded-[12px] bg-[#E8F8ED] px-4 py-3 text-xs text-[#0F7A39]">
-            現在 <strong>{session.memberName}</strong> として参加中です。
-            <button type="button" className="mt-2 block text-xs underline" onClick={onLeaveSession}>
-              セッションを終了する
+        <div className="rounded-[18px] bg-[#FFF4C6] px-4 py-4">
+          <p className="text-[12px] font-bold text-[#5D5D5D]">または 新しい名前で参加</p>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+            <input
+              value={newMemberName}
+              onChange={(event) => onNewMemberNameChange(event.target.value)}
+              placeholder="ユーザ名"
+              className="h-[44px] flex-1 rounded-[12px] border border-[#D9D9D9] bg-white px-4 text-sm font-bold text-[#1D1B20] placeholder:text-[#ADADAD] focus:border-[#EB8D00] focus:outline-none"
+            />
+            <button
+              type="button"
+              className={`${buttonSecondary} h-[44px] px-6 text-sm`}
+              onClick={onJoinNew}
+              disabled={isJoining || !newMemberName.trim()}
+            >
+              {isJoining ? '登録中…' : '新しい名前で参加'}
             </button>
           </div>
+        </div>
+
+        {session ? (
+          <div className="space-y-3 rounded-[18px] bg-[#E8F8ED] px-4 py-4 text-xs text-[#0F7A39]">
+            <p>
+              現在 <strong>{session.memberName}</strong> として参加中です。
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button type="button" className={`${buttonMuted} px-4 py-2 text-xs`} onClick={onStartVoting}>
+                {canStartVoting ? 'カードを取得' : '準備ができたらカード取得'}
+              </button>
+              <button type="button" className={`${buttonSecondary} px-4 py-2 text-xs`} onClick={onLeaveSession}>
+                参加を終了
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={`${buttonMuted} w-full px-6 py-2 text-sm`}
+            onClick={onStartVoting}
+            disabled={!canStartVoting}
+          >
+            {canStartVoting ? 'カードを取得' : '投票の準備が整ったら表示されます'}
+          </button>
         )}
       </div>
     </section>
@@ -606,75 +671,91 @@ function VoteScreen({
   isFetchingCards,
   isSubmittingVote,
 }: VoteScreenProps) {
+  const currentPosition = totalCards > 0 ? Math.min(answeredCount + 1, totalCards) : 0;
+
   return (
-    <section className={`${panelClass} bg-white p-0`}>
-      <header className="px-6 pt-6 text-center">
+    <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_16px_32px_rgba(0,0,0,0.08)]">
+      <header className="text-center">
         <p className="text-xs font-bold text-[#5D5D5D]">{roomName}</p>
         <h2 className="mt-2 text-[20px] font-bold text-[#EB8D00]">カードを評価</h2>
         {totalCards > 0 && (
           <p className="mt-1 text-xs text-[#5D5D5D]">
-            {Math.min(answeredCount + 1, totalCards)} / {totalCards}
+            {currentPosition} / {totalCards}
           </p>
         )}
-        <div className="mt-4 px-6">
-          <button
-            type="button"
-            className={`${buttonMuted} w-full px-6 py-2 text-sm`}
-            onClick={onReload}
-            disabled={isFetchingCards}
-          >
-            {isFetchingCards ? '再取得中…' : 'カードを再取得'}
-          </button>
-        </div>
+        <button
+          type="button"
+          className={`${buttonMuted} mt-4 w-full px-6 py-2 text-sm`}
+          onClick={onReload}
+          disabled={isFetchingCards}
+        >
+          {isFetchingCards ? 'カードを再取得中…' : 'カードを再取得'}
+        </button>
       </header>
 
       {currentCard ? (
-        <article className="mt-6 flex flex-col gap-4 px-6 pb-8">
-          <div className="overflow-hidden rounded-[20px] bg-[#FFF4C6]">
+        <article className="mt-6 space-y-5">
+          <div className="overflow-hidden rounded-[24px] bg-[#FFF4C6] shadow-[0_12px_24px_rgba(0,0,0,0.12)]">
             {currentCard.photo_urls[0] ? (
               <img
                 src={currentCard.photo_urls[0]}
                 alt={currentCard.name}
-                className="h-[200px] w-full object-cover"
+                className="h-[220px] w-full object-cover"
                 loading="lazy"
               />
             ) : (
-              <div className="flex h-[200px] items-center justify-center text-sm text-[#5D5D5D]">
+              <div className="flex h-[220px] items-center justify-center text-sm text-[#5D5D5D]">
                 画像は準備中です
               </div>
             )}
           </div>
+
           <div className="space-y-3 text-left">
-            <h3 className="text-lg font-bold text-[#1D1B20]">{currentCard.name}</h3>
-            <p className="text-sm leading-relaxed text-[#5D5D5D]">{currentCard.summary_simple}</p>
-            <div className="flex items-center gap-2 text-xs text-[#5D5D5D]">
+            <h3 className="text-[18px] font-bold text-[#1D1B20]">{currentCard.name}</h3>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#5D5D5D]">
               <span className="rounded-full bg-[#FFE7DF] px-3 py-1 font-bold text-[#EB8D00]">
                 ★ {currentCard.rating.toFixed(1)}
               </span>
               <span>{currentCard.user_ratings_total} 件のレビュー</span>
             </div>
+            {currentCard.summary_simple && (
+              <div className="rounded-[20px] border border-[#EB8D00]/30 bg-[#FFF4C6] px-4 py-3 text-[12px] leading-relaxed text-[#EB8D00]">
+                {currentCard.summary_simple}
+              </div>
+            )}
           </div>
-          <div className="mt-4 flex items-center justify-center gap-6">
+
+          <div className="flex items-center justify-center gap-12 pt-2">
             <button
               type="button"
-              className={`${buttonMuted} w-32 px-6 py-3 text-sm`}
+              className={buttonCircleNegative}
               onClick={() => onVote(false)}
               disabled={isSubmittingVote}
+              aria-label="良くないね"
             >
-              良くないね
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16.5 7.5L7.5 16.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                <path d="M7.5 7.5L16.5 16.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
             </button>
             <button
               type="button"
-              className={`${buttonDanger} w-32 px-6 py-3 text-sm`}
+              className={buttonCirclePositive}
               onClick={() => onVote(true)}
               disabled={isSubmittingVote}
+              aria-label="いいね"
             >
-              いいね
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M12 20.5C11.8333 20.5 11.6667 20.4542 11.5 20.3625C8.33333 18.475 6 16.6 4.5 14.7375C3 12.875 2.25 10.95 2.25 8.9625C2.25 7.5375 2.721 6.3375 3.663 5.3625C4.605 4.3875 5.775 3.9 7.173 3.9C8.005 3.9 8.773 4.1125 9.477 4.5375C10.181 4.9625 10.75 5.55 11.184 6.3H12.816C13.25 5.55 13.819 4.9625 14.523 4.5375C15.227 4.1125 15.995 3.9 16.827 3.9C18.225 3.9 19.395 4.3875 20.337 5.3625C21.279 6.3375 21.75 7.5375 21.75 8.9625C21.75 10.95 21 12.875 19.5 14.7375C18 16.6 15.6667 18.475 12.5 20.3625C12.3333 20.4542 12.1667 20.5 12 20.5Z"
+                  fill="currentColor"
+                />
+              </svg>
             </button>
           </div>
         </article>
       ) : (
-        <div className="px-6 pb-8 text-center text-sm text-[#5D5D5D]">
+        <div className="mt-6 rounded-[18px] bg-[#FFF4C6] px-6 py-8 text-center text-sm text-[#5D5D5D]">
           カードを準備しています。少し待ってから再取得をお試しください。
         </div>
       )}
@@ -691,7 +772,7 @@ interface ResultScreenProps {
 
 function ResultScreen({ ranking, onRestart, roomName, onRefreshRanking }: ResultScreenProps) {
   return (
-    <section className={`${panelClass} bg-white p-6 space-y-5`}>
+    <section className="rounded-[24px] bg-white/95 px-6 py-6 shadow-[0_16px_32px_rgba(0,0,0,0.08)]">
       <header className="space-y-2 text-center">
         <h2 className="text-[20px] font-bold text-[#EB8D00]">暫定ランキング</h2>
         <p className="text-sm font-bold text-[#1D1B20]">{roomName || 'ルーム名未設定'}</p>
@@ -699,29 +780,33 @@ function ResultScreen({ ranking, onRestart, roomName, onRefreshRanking }: Result
           ランキングを更新
         </button>
       </header>
-      <div className="space-y-4">
+
+      <div className="mt-6 space-y-4">
         {ranking.map((item) => (
           <div
             key={item.place_id}
-            className={`${panelClass} flex items-center justify-between bg-[#FFE7DF] px-5 py-3`}
+            className="flex items-center justify-between rounded-[18px] bg-[#FFE7DF] px-5 py-4 shadow-[0_8px_18px_rgba(235,141,0,0.18)]"
           >
             <div>
-              <p className="text-sm font-bold text-[#EB8D00]">#{item.rank}</p>
-              <p className="text-lg font-bold text-black">{item.name}</p>
-              <p className="text-xs text-[#5D5D5D]">
-                いいね {item.like_count} / 良くないね {item.dislike_count} ・ ★ {item.rating.toFixed(1)}
+              <p className="text-[16px] font-bold text-[#EB8D00]">
+                {item.rank}位：{item.like_count}件
+              </p>
+              <p className="text-[18px] font-bold text-[#1D1B20]">{item.name}</p>
+              <p className="text-[11px] text-[#5D5D5D]">
+                良くないね {item.dislike_count} 件・★ {item.rating.toFixed(1)} / {item.user_ratings_total} 件
               </p>
             </div>
-            <span className="text-xs font-bold text-[#5D5D5D]">{item.user_ratings_total} 件</span>
+            <span className="text-[11px] font-bold text-[#5D5D5D]">score: {item.score.toFixed(1)}</span>
           </div>
         ))}
         {ranking.length === 0 && (
-          <p className="rounded-[16px] bg-[#FFF4C6] px-6 py-5 text-center text-sm text-[#5D5D5D]">
+          <p className="rounded-[18px] bg-[#FFF4C6] px-6 py-5 text-center text-sm text-[#5D5D5D]">
             まだランキングがありません。幹事が集計を再実行するまでお待ちください。
           </p>
         )}
       </div>
-      <button type="button" className={`${buttonMuted} w-full px-6 py-2 text-sm`} onClick={onRestart}>
+
+      <button type="button" className={`${buttonMuted} mt-6 w-full px-6 py-2 text-sm`} onClick={onRestart}>
         もう一度カードを取得
       </button>
     </section>
