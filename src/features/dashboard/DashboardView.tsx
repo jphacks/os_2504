@@ -22,7 +22,6 @@ export function DashboardView() {
   const [members, setMembers] = useState<Member[]>([]);
   const [memberName, setMemberName] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [memberToken, setMemberToken] = useState<string | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [ranking, setRanking] = useState<RankingItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<{ tone: 'info' | 'success' | 'error'; text: string } | null>(null);
@@ -42,9 +41,9 @@ export function DashboardView() {
 
   const stepId: StepId = useMemo(() => {
     if (!room) return 'create';
-    if (!memberToken) return 'members';
+    if (selectedMemberId == null) return 'members';
     return 'voting';
-  }, [room, memberToken]);
+  }, [room, selectedMemberId]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -88,7 +87,7 @@ export function DashboardView() {
       if (result.ok) {
         setRoom(result.data);
         setMembers([]);
-        setMemberToken(null);
+        setSelectedMemberId(null);
         showMessage('success', 'ルームを作成しました。準備が完了するまで少しお待ちください。');
       }
     } catch (error) {
@@ -124,7 +123,7 @@ export function DashboardView() {
       if (result.ok) {
         setMembers(result.data);
         const firstMember = result.data[0];
-        if (!selectedMemberId && firstMember) {
+        if (selectedMemberId == null && firstMember) {
           setSelectedMemberId(firstMember.member_id);
         }
         showMessage('info', 'メンバー一覧を更新しました。');
@@ -149,28 +148,14 @@ export function DashboardView() {
     }
   };
 
-  const issueMemberSession = async () => {
-    if (!roomCode || !selectedMemberId) return;
-    try {
-      const result = await api<{ ok: boolean; data: { member_token: string; expires_in: number } }>(
-        `/api/rooms/${roomCode}/members/${selectedMemberId}/session`,
-        { method: 'POST' },
-      );
-      if (result.ok) {
-        setMemberToken(result.data.member_token);
-        showMessage('success', 'メンバートークンを発行しました。');
-      }
-    } catch (error) {
-      showMessage('error', (error as Error).message);
-    }
-  };
-
   const fetchRestaurants = async () => {
-    if (!roomCode || !memberToken) return;
+    if (!roomCode) return;
+    if (selectedMemberId == null) {
+      showMessage('error', '投票に使用するメンバーを選択してください。');
+      return;
+    }
     try {
-      const result = await api<{ ok: boolean; data: { items: Restaurant[] } }>(`/api/rooms/${roomCode}/restaurants`, {
-        headers: { Authorization: `Bearer ${memberToken}` },
-      });
+      const result = await api<{ ok: boolean; data: { items: Restaurant[] } }>(`/api/rooms/${roomCode}/restaurants`);
       if (result.ok) {
         reset();
         setRestaurants(result.data.items);
@@ -187,11 +172,14 @@ export function DashboardView() {
   };
 
   const sendVote = async (placeId: string, isLiked: boolean) => {
-    if (!roomCode || !memberToken) return;
+    if (!roomCode) return;
+    if (selectedMemberId == null) {
+      showMessage('error', '投票するメンバーを選択してください。');
+      return;
+    }
     try {
-      await api(`/api/rooms/${roomCode}/likes`, {
+      await api(`/api/rooms/${roomCode}/${selectedMemberId}/likes`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${memberToken}` },
         body: JSON.stringify({ place_id: placeId, is_liked: isLiked }),
       });
       showMessage('success', isLiked ? 'いいねを記録しました。' : '良くないねを記録しました。');
@@ -339,7 +327,7 @@ export function DashboardView() {
                 <div className="panel__header">
                   <div>
                     <h2>メンバー管理</h2>
-                    <p>メンバーの追加と投票用トークンの発行を行います。</p>
+                    <p>メンバーを追加し、投票に利用する参加者を選択します。</p>
                   </div>
                   <button className={buttonSecondary} onClick={loadMembers}>
                     メンバー再取得
@@ -365,7 +353,10 @@ export function DashboardView() {
                     <select
                       className="input"
                       value={selectedMemberId ?? ''}
-                      onChange={(e) => setSelectedMemberId(e.target.value || null)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedMemberId(value ? value : null);
+                      }}
                     >
                       <option value="">未選択</option>
                       {members.map((m) => (
@@ -375,17 +366,14 @@ export function DashboardView() {
                       ))}
                     </select>
                   </label>
-                  <button className={buttonPrimary} onClick={issueMemberSession} disabled={!selectedMemberId}>
-                    トークン発行
-                  </button>
-                  {memberToken && (
-                    <p className="info-box">メンバー用トークンを取得済みです。このブラウザで投票APIを利用できます。</p>
-                  )}
+                  <p className="info-box">
+                    管理画面から評価を送る場合は、ここで選んだメンバーとして送信されます。
+                  </p>
                 </div>
               </section>
             )}
 
-            {room && memberToken && (
+            {room && selectedMemberId != null && (
               <section className={panelClass}>
                 <div className="panel__header">
                   <div>
@@ -408,7 +396,11 @@ export function DashboardView() {
                       カードがまだありません。投票を開始するには「カード取得」を押してください。
                     </p>
                   )}
-                  <button className={buttonSecondary} onClick={fetchRestaurants}>
+                  <button
+                    className={buttonSecondary}
+                    onClick={fetchRestaurants}
+                    disabled={selectedMemberId == null}
+                  >
                     カード取得
                   </button>
                 </div>

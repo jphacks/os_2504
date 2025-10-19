@@ -100,9 +100,7 @@ sequenceDiagram
         W->>S: POST /rooms/{room_code}/members
         S-->>W: 201 {member_id, member_name}
     end
-    W->>S: POST /rooms/{room_code}/members/{member_id}/session
-    S-->>W: 200 {member_token, expires_in}
-    W-->>U: 投票画面へ遷移（Token保持）
+    W-->>U: 投票画面へ遷移（member_id をローカル保持）
 
 ```
 
@@ -129,12 +127,12 @@ sequenceDiagram
 
     loop スワイプ操作ごと
         U->>W: いいね/良くないね
-        W->>S: POST /rooms/{room_code}/likes (Bearer member_token)
+        W->>S: POST /rooms/{room_code}/{member_id}/likes
         S-->>W: 200 {is_liked, updated_at}
     end
 
     opt 投票一覧の確認
-        W->>S: GET /rooms/{room_code}/likes?member_id=me
+        W->>S: GET /rooms/{room_code}/{member_id}/likes
         S-->>W: 200 {items:[...], next_cursor}
     end
 
@@ -218,7 +216,7 @@ sequenceDiagram
     participant S as Backend API (S)
 
     U->>W: 「最初からやり直す（{member_name}）」を選択
-    W->>S: DELETE /rooms/{room_code}/likes/{member_id} (Bearer member_token)
+    W->>S: DELETE /rooms/{room_code}/{member_id}/likes
     alt 呼び出し者が当該roomのメンバー && status=voting
         S-->>W: 200 {reset:true, deleted_count:n, deleted_by:"<caller_member_id>"}
         W-->>U: リセット完了→カード再配布へ

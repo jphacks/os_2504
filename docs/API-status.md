@@ -7,13 +7,12 @@
 | ルーム | `POST /rooms` | ルーム作成＋準備ジョブ起動 | 作成直後に `status=waiting`、サンプル候補の非同期準備を開始 |
 |  | `PATCH /rooms/{room_code}/settings` | 検索条件の更新と再準備 | 値変更時は `waiting` に戻り再準備をキューイング |
 |  | `GET /rooms/{room_code}` | 共有情報・準備進捗の取得 | `preparation.progress / preparedCount / expectedCount` を返却 |
-| メンバー | `GET /rooms/{room_code}/members` | メンバー一覧 | UI で選択肢として利用 |
+| メンバー | `GET /rooms/{room_code}/members` | メンバー一覧 | UI で選択肢として利用（member_id は UUID） |
 |  | `POST /rooms/{room_code}/members` | メンバー追加 | 名前のみで登録 |
-|  | `POST /rooms/{room_code}/members/{member_id}/session` | メンバートークン発行 | JWT 形式、投票 API で必須 |
 | 候補カード | `GET /rooms/{room_code}/restaurants` | 投票カード取得 | `status=voting` 時のみ 200、`waiting` は 425 `ROOM_NOT_READY` |
-| 投票 | `POST /rooms/{room_code}/likes` | いいね／良くないね記録 | `Authorization: Bearer <member_token>` が必須 |
-|  | `GET /rooms/{room_code}/likes` | 投票一覧 | `member_id`／`place_id` フィルタ対応 |
-|  | `DELETE /rooms/{room_code}/likes/{member_id}` | 指定メンバーの投票初期化 | `deleted_count` を返却 |
+| 投票 | `POST /rooms/{room_code}/{member_id}/likes` | いいね／良くないね記録 | パスでメンバーIDを指定 |
+|  | `GET /rooms/{room_code}/{member_id}/likes` | 指定メンバーの投票一覧 | `place_id`／`is_liked` フィルタ対応 |
+|  | `DELETE /rooms/{room_code}/{member_id}/likes` | 指定メンバーの投票初期化 | `deleted_count` を返却 |
 | 集計 | `GET /rooms/{room_code}/ranking` | ランキング取得 | `score = likes - dislikes`、同点は評価順 |
 | 店舗詳細 | `GET /restaurants/{place_id}` | 店舗詳細の取得 | 住所・営業時間・評価など DB から返却 |
 |  | `GET /restaurants/{place_id}/reviews` | レビュー一覧 | サンプルデータではレビュー ID・本文を返却 |

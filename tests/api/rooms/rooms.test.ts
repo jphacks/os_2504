@@ -13,7 +13,6 @@ import {
   roomSettings,
 } from '../../../db/schema.js';
 import { sampleRestaurants } from '../../../server/sample-data.js';
-import { signMemberToken } from '../../../server/tokens.js';
 
 const app = createApp();
 
@@ -73,7 +72,7 @@ describe('Rooms API', () => {
     expect(res.body.data.share_url).toContain(code);
   });
 
-  it('allows member creation and session issuance', async () => {
+  it('allows member creation and returns UUID identifiers', async () => {
     const create = await request(app).post('/api/rooms').send({ room_name: 'Member Room' });
     const code = create.body.data.room_code;
 
@@ -83,10 +82,8 @@ describe('Rooms API', () => {
 
     expect(memberRes.status).toBe(201);
     const memberId = memberRes.body.data.member_id;
-
-    const sessionRes = await request(app).post(`/api/rooms/${code}/members/${memberId}/session`);
-    expect(sessionRes.status).toBe(200);
-    expect(sessionRes.body.data.member_token).toBeTruthy();
+    expect(typeof memberId).toBe('string');
+    expect(memberId).toMatch(/[0-9a-fA-F-]{36}/);
   });
 
   it('provides restaurants after preparation completes', async () => {
@@ -111,13 +108,11 @@ describe('Rooms API', () => {
     const memberRes = await request(app)
       .post(`/api/rooms/${code}/members`)
       .send({ member_name: '花子' });
-    const memberId = memberRes.body.data.member_id;
-    const token = signMemberToken(createRes.body.data.room_id, memberId).token;
+    const memberId = memberRes.body.data.member_id as string;
     const sample = sampleRestaurants[0];
 
     await request(app)
-      .post(`/api/rooms/${code}/likes`)
-      .set('Authorization', `Bearer ${token}`)
+      .post(`/api/rooms/${code}/${memberId}/likes`)
       .send({ place_id: sample.place_id, is_liked: true })
       .expect(200);
 
@@ -148,19 +143,16 @@ describe('Rooms API', () => {
     const memberRes = await request(app)
       .post(`/api/rooms/${code}/members`)
       .send({ member_name: '次郎' });
-    const memberId = memberRes.body.data.member_id;
-    const token = signMemberToken(createRes.body.data.room_id, memberId).token;
+    const memberId = memberRes.body.data.member_id as string;
     const sample = sampleRestaurants[1];
 
     await request(app)
-      .post(`/api/rooms/${code}/likes`)
-      .set('Authorization', `Bearer ${token}`)
+      .post(`/api/rooms/${code}/${memberId}/likes`)
       .send({ place_id: sample.place_id, is_liked: false })
       .expect(200);
 
     const resetRes = await request(app)
-      .delete(`/api/rooms/${code}/likes/${memberId}`)
-      .set('Authorization', `Bearer ${token}`)
+      .delete(`/api/rooms/${code}/${memberId}/likes`)
       .expect(200);
     expect(resetRes.body.data.deleted_count).toBeGreaterThanOrEqual(1);
 

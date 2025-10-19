@@ -1,7 +1,6 @@
 type StoredMemberSession = {
   memberId: string;
   memberName: string;
-  token: string;
 };
 
 const prefix = 'mogfinder::session::';
@@ -12,7 +11,7 @@ export function loadParticipantSession(roomCode: string): StoredMemberSession | 
     const raw = window.sessionStorage.getItem(`${prefix}${roomCode}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StoredMemberSession;
-    if (parsed && typeof parsed.memberId === 'string' && typeof parsed.token === 'string') {
+    if (parsed && typeof parsed.memberId === 'string') {
       return parsed;
     }
   } catch {

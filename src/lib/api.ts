@@ -1,10 +1,26 @@
+function normalizeHeaders(headers?: HeadersInit): Record<string, string> {
+  if (!headers) return {};
+  if (headers instanceof Headers) {
+    const result: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      result[key] = value;
+    });
+    return result;
+  }
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  }
+  return { ...headers };
+}
+
 export async function api<T>(input: RequestInfo | URL, init?: RequestInit) {
+  const { headers: initHeaders, ...restInit } = init ?? {};
   const res = await fetch(input, {
+    ...restInit,
     headers: {
       'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
+      ...normalizeHeaders(initHeaders),
     },
-    ...init,
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);

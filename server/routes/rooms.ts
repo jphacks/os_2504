@@ -17,7 +17,6 @@ import {
   type LikeView,
   type RoomWithSettings,
 } from '../store.js';
-import { signMemberToken, verifyMemberToken } from '../tokens.js';
 
 const router = Router();
 
@@ -51,18 +50,17 @@ const findRoom = asyncHandler(async (req: Request, res: Response, next: NextFunc
 
 type MemberAwareRequest = RoomRequest & { memberId?: string };
 
-const authenticateMember: RequestHandler = asyncHandler(async (req, res, next) => {
-  const roomReq = req as MemberAwareRequest;
-  const auth = req.get('authorization');
-  if (!auth || !auth.startsWith('Bearer ')) {
-    res.status(401).json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Authorization header required', details: {} } });
-    return;
-  }
+const memberParamSchema = z.object({
+  member_id: z.string().uuid('member_id must be a valid UUID'),
+});
 
-  const token = auth.slice('Bearer '.length);
-  const verified = verifyMemberToken(token);
-  if (!verified) {
-    res.status(401).json({ ok: false, error: { code: 'INVALID_TOKEN', message: 'Invalid member token', details: {} } });
+const findMember = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const roomReq = req as MemberAwareRequest;
+  const parsed = memberParamSchema.safeParse({ member_id: req.params.member_id });
+  if (!parsed.success) {
+    res
+      .status(400)
+      .json({ ok: false, error: { code: 'MEMBER_ID_INVALID', message: 'member_id must be a valid UUID', details: {} } });
     return;
   }
 
@@ -71,14 +69,9 @@ const authenticateMember: RequestHandler = asyncHandler(async (req, res, next) =
     return;
   }
 
-  if (roomReq.room.room.id !== verified.roomId) {
-    res.status(403).json({ ok: false, error: { code: 'ROOM_MISMATCH', message: 'Token does not belong to this room', details: {} } });
-    return;
-  }
-
-  const member = await getMember(roomReq.room.room.id, verified.memberId);
+  const member = await getMember(roomReq.room.room.id, parsed.data.member_id);
   if (!member) {
-    res.status(403).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found in room', details: {} } });
+    res.status(404).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found', details: {} } });
     return;
   }
 
@@ -115,10 +108,6 @@ const likeSchema = z.object({
 });
 
 const likesQuerySchema = z.object({
-  member_id: z
-    .union([z.string(), z.array(z.string()).nonempty()])
-    .optional()
-    .transform((value) => (typeof value === 'string' ? [value] : value)),
   place_id: z.string().optional(),
   is_liked: z
     .union([z.literal('true'), z.literal('false')])
@@ -225,34 +214,6 @@ router.post(
   }),
 );
 
-router.post(
-  '/:room_code/members/:member_id/session',
-  findRoom,
-  asyncHandler(async (req: Request, res: Response) => {
-    const room = (req as RoomRequest).room!;
-    const memberId = typeof req.params.member_id === 'string' ? req.params.member_id : '';
-    if (!memberId) {
-      res.status(400).json({ ok: false, error: { code: 'MEMBER_ID_REQUIRED', message: 'member_id required', details: {} } });
-      return;
-    }
-    const member = await getMember(room.room.id, memberId);
-    if (!member) {
-      res.status(404).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found', details: {} } });
-      return;
-    }
-
-    const signed = signMemberToken(room.room.id, member.id);
-    res.json({
-      ok: true,
-      data: {
-        member_token: signed.token,
-        expires_in: signed.expiresIn,
-        member: { member_id: member.id, member_name: member.memberName },
-      },
-    });
-  }),
-);
-
 router.get(
   '/:room_code/restaurants',
   findRoom,
@@ -275,9 +236,9 @@ router.get(
 );
 
 router.post(
-  '/:room_code/likes',
+  '/:room_code/:member_id/likes',
   findRoom,
-  authenticateMember,
+  findMember,
   asyncHandler(async (req: Request, res: Response) => {
     const memberReq = req as MemberAwareRequest & { memberId: string };
     const room = memberReq.room!;
@@ -338,11 +299,11 @@ function buildLikeResponse(
 }
 
 router.get(
-  '/:room_code/likes',
+  '/:room_code/:member_id/likes',
   findRoom,
-  authenticateMember,
+  findMember,
   asyncHandler(async (req: Request, res: Response) => {
-    const memberReq = req as MemberAwareRequest;
+    const memberReq = req as MemberAwareRequest & { memberId: string };
     const room = memberReq.room!;
 
     const parsedQuery = likesQuerySchema.safeParse(req.query);
@@ -351,11 +312,11 @@ router.get(
       return;
     }
 
-    const { member_id: membersFilter, place_id: placeFilter, is_liked: likedFilter } = parsedQuery.data;
+    const { place_id: placeFilter, is_liked: likedFilter } = parsedQuery.data;
 
     const likesList = await listLikes({
       roomId: room.room.id,
-      memberIds: membersFilter,
+      memberIds: [memberReq.memberId!],
       placeId: placeFilter,
       isLiked: likedFilter,
     });
@@ -373,29 +334,18 @@ router.get(
 );
 
 router.delete(
-  '/:room_code/likes/:member_id',
+  '/:room_code/:member_id/likes',
   findRoom,
-  authenticateMember,
+  findMember,
   asyncHandler(async (req: Request, res: Response) => {
-    const room = (req as MemberAwareRequest).room!;
+    const memberReq = req as MemberAwareRequest & { memberId: string };
+    const room = memberReq.room!;
     if (room.room.status !== 'voting') {
       res.status(409).json({ ok: false, error: { code: 'ROOM_NOT_IN_VOTING', message: 'Voting is not available right now.', details: {} } });
       return;
     }
 
-    const targetMemberId = typeof req.params.member_id === 'string' ? req.params.member_id : '';
-    if (!targetMemberId) {
-      res.status(400).json({ ok: false, error: { code: 'MEMBER_ID_REQUIRED', message: 'member_id required', details: {} } });
-      return;
-    }
-
-    const member = await getMember(room.room.id, targetMemberId);
-    if (!member) {
-      res.status(404).json({ ok: false, error: { code: 'MEMBER_NOT_FOUND', message: 'Member not found', details: {} } });
-      return;
-    }
-
-    const deletedCount = await resetLikes(room.room.id, targetMemberId);
+    const deletedCount = await resetLikes(room.room.id, memberReq.memberId!);
     res.json({ ok: true, data: { reset: true, deleted_count: deletedCount } });
   }),
 );

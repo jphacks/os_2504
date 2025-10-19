@@ -11,7 +11,7 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
   const [room, setRoom] = useState<RoomSummary | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [session, setSession] = useState<StoredMemberSession | null>(() => loadParticipantSession(roomCode));
-  const [selectedMemberId, setSelectedMemberId] = useState(session?.memberId ?? '');
+  const [selectedMemberId, setSelectedMemberId] = useState<string | ''>(session?.memberId ?? '');
   const [newMemberName, setNewMemberName] = useState('');
   const [statusMessage, setStatusMessage] = useState<{ tone: 'info' | 'success' | 'error'; text: string } | null>(null);
   const [isLoadingRoom, setIsLoadingRoom] = useState(true);
@@ -144,7 +144,6 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
       try {
         const result = await api<{ ok: boolean; data: { items: Restaurant[] } }>(
           `/api/rooms/${roomCode}/restaurants`,
-          { headers: { Authorization: `Bearer ${targetSession.token}` } },
         );
         if (result.ok) {
           const items = result.data.items;
@@ -184,9 +183,8 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
     if (!target || !session || isSubmittingVote) return;
     setIsSubmittingVote(true);
     try {
-      await api(`/api/rooms/${roomCode}/likes`, {
+      await api(`/api/rooms/${roomCode}/${session.memberId}/likes`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${session.token}` },
         body: JSON.stringify({ place_id: target.place_id, is_liked: isLiked }),
       });
       const remaining = queue.length - 1;
@@ -206,29 +204,26 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
   };
 
   const joinAsExisting = async () => {
-    if (!selectedMemberId) {
+    if (selectedMemberId === '') {
       showMessage('error', '既存メンバーを選択してください。');
+      return;
+    }
+    const member = members.find((m) => m.member_id === selectedMemberId);
+    if (!member) {
+      showMessage('error', '選択したメンバーが見つかりません。');
       return;
     }
     setIsJoining(true);
     try {
-      const result = await api<{ ok: boolean; data: { member_token: string; expires_in: number } }>(
-        `/api/rooms/${roomCode}/members/${selectedMemberId}/session`,
-        { method: 'POST' },
-      );
-      if (result.ok) {
-        const member = members.find((m) => m.member_id === selectedMemberId);
-        const nextSession: StoredMemberSession = {
-          memberId: selectedMemberId,
-          memberName: member?.member_name ?? '参加メンバー',
-          token: result.data.member_token,
-        };
-        setSession(nextSession);
-        saveParticipantSession(roomCode, nextSession);
-        setStep('join');
-        showMessage('success', `${nextSession.memberName} として参加しました。`);
-        await startVoting(nextSession);
-      }
+      const nextSession: StoredMemberSession = {
+        memberId: member.member_id,
+        memberName: member.member_name,
+      };
+      setSession(nextSession);
+      saveParticipantSession(roomCode, nextSession);
+      setStep('join');
+      showMessage('success', `${nextSession.memberName} として参加しました。`);
+      await startVoting(nextSession);
     } catch (error) {
       showMessage('error', (error as Error).message);
     } finally {
@@ -251,23 +246,17 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
       if (createResult.ok) {
         const newMember = createResult.data;
         setMembers((prev) => [...prev, newMember]);
-        const sessionResult = await api<{ ok: boolean; data: { member_token: string; expires_in: number } }>(
-          `/api/rooms/${roomCode}/members/${newMember.member_id}/session`,
-          { method: 'POST' },
-        );
-        if (sessionResult.ok) {
-          const nextSession: StoredMemberSession = {
-            memberId: newMember.member_id,
-            memberName: newMember.member_name,
-            token: sessionResult.data.member_token,
-          };
-          setSession(nextSession);
-          saveParticipantSession(roomCode, nextSession);
-          setNewMemberName('');
-          setStep('join');
-          showMessage('success', `${nextSession.memberName} として参加を開始しました。`);
-          await startVoting(nextSession);
-        }
+        const nextSession: StoredMemberSession = {
+          memberId: newMember.member_id,
+          memberName: newMember.member_name,
+        };
+        setSession(nextSession);
+        saveParticipantSession(roomCode, nextSession);
+        setSelectedMemberId(newMember.member_id);
+        setNewMemberName('');
+        setStep('join');
+        showMessage('success', `${nextSession.memberName} として参加を開始しました。`);
+        await startVoting(nextSession);
       }
     } catch (error) {
       showMessage('error', (error as Error).message);
@@ -279,6 +268,7 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
   const leaveSession = () => {
     setSession(null);
     saveParticipantSession(roomCode, null);
+    setSelectedMemberId('');
     setQueue([]);
     setTotalCards(0);
     setRanking([]);
@@ -286,7 +276,7 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
     showMessage('info', '参加セッションを終了しました。');
   };
 
-  const canStartVoting = session && room?.status === 'voting' && !isFetchingCards;
+  const canStartVoting = Boolean(session) && room?.status === 'voting' && !isFetchingCards;
 
   return (
     <main className="app">
@@ -374,7 +364,10 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
                     <select
                       className="input"
                       value={selectedMemberId}
-                      onChange={(e) => setSelectedMemberId(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedMemberId(value || '');
+                      }}
                     >
                       <option value="">未選択</option>
                       {members.map((member) => (
@@ -383,7 +376,11 @@ export function ParticipantView({ roomCode }: { roomCode: string }) {
                         </option>
                       ))}
                     </select>
-                    <button className={buttonPrimary} onClick={joinAsExisting} disabled={!selectedMemberId || isJoining}>
+                    <button
+                      className={buttonPrimary}
+                      onClick={joinAsExisting}
+                      disabled={selectedMemberId === '' || isJoining}
+                    >
                       {isJoining ? '処理中…' : '選択したメンバーで参加'}
                     </button>
                   </div>
