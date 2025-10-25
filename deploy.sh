@@ -4,6 +4,18 @@
 
 set -e
 
+# .envの内容を自動で読み込む（都度exportする手間を省く）
+if [ -f .env ]; then
+  echo "📄 .envファイルを読み込んでいます..."
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+else
+  echo "❌ エラー: .envファイルが見つかりません"
+  exit 1
+fi
+
 # 設定
 PROJECT_ID="${GCP_PROJECT_ID:-mogufinder-app}"
 REGION="${GCP_REGION:-asia-northeast1}"
@@ -35,7 +47,7 @@ gcloud run deploy $BACKEND_SERVICE \
   --platform managed \
   --region $REGION \
   --allow-unauthenticated \
-  --set-env-vars GOOGLE_API_KEY=$GOOGLE_API_KEY \
+  --set-env-vars GOOGLE_API_KEY=$GOOGLE_API_KEY,FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:5173} \
   --memory 512Mi \
   --cpu 1 \
   --max-instances 10
