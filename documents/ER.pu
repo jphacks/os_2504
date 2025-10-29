@@ -1,0 +1,86 @@
+@startuml
+title FoodFinder Group Feature ER Diagram
+
+entity "groups" as groups {
+  *id : VARCHAR(32)
+  --
+  group_name : VARCHAR(50)
+  organizer_id : VARCHAR(64)
+  latitude : DOUBLE
+  longitude : DOUBLE
+  radius : INT
+  min_price : TINYINT
+  max_price : TINYINT
+  types : JSON
+  status : VARCHAR(20)
+  created_at : DATETIME
+}
+
+entity "group_members" as group_members {
+  *id : BIGINT
+  --
+  group_id : VARCHAR(32)
+  member_id : VARCHAR(64)
+  joined_at : DATETIME
+  --
+  UNIQUE (group_id, member_id)
+}
+
+entity "group_restaurants" as group_restaurants {
+  *id : BIGINT
+  --
+  group_id : VARCHAR(32)
+  place_id : VARCHAR(128)
+  position : INT
+  name : VARCHAR(255)
+  address : VARCHAR(255)
+  rating : DOUBLE
+  price_level : TINYINT
+  photo_url : TEXT
+  photo_urls : JSON
+  lat : DOUBLE
+  lng : DOUBLE
+  types : JSON
+  reviews : JSON
+  phone_number : VARCHAR(64)
+  website : VARCHAR(255)
+  google_maps_url : VARCHAR(255)
+  user_ratings_total : INT
+  opening_hours : JSON
+  summary : TEXT
+  --
+  UNIQUE (group_id, place_id)
+}
+
+entity "group_votes" as group_votes {
+  *id : BIGINT
+  --
+  group_id : VARCHAR(32)
+  member_id : VARCHAR(64)
+  place_id : VARCHAR(128)
+  value : VARCHAR(10)
+  created_at : DATETIME
+  --
+  UNIQUE (group_id, member_id, place_id)
+}
+
+groups ||--o{ group_members : "members"
+groups ||--o{ group_restaurants : "candidates"
+groups ||--o{ group_votes : "votes"
+
+note right of group_members
+  FK group_id -> groups.id
+  ON DELETE CASCADE
+end note
+
+note right of group_restaurants
+  FK group_id -> groups.id
+  ON DELETE CASCADE
+end note
+
+note right of group_votes
+  FK group_id -> groups.id
+  ON DELETE CASCADE
+end note
+
+@enduml
