@@ -5,3 +5,5 @@ httpx==0.26.0
 pydantic>=2.8,<3.0
 pydantic-settings>=2.9,<3.0
 slowapi==0.1.9
+SQLAlchemy>=2.0,<3.0
+aiomysql>=0.2.0

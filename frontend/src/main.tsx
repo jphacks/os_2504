@@ -5,6 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline'
 
 import './index.css'
 import './App.css'
+import './shared/lib/loadGoogleMapsSdk'
 import AppRouter from './app/AppRouter'
 import { AuthProvider } from './app/providers/AuthProvider'
 import theme from './app/theme'

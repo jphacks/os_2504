@@ -26,6 +26,7 @@ import MapIcon from '@mui/icons-material/Map'
 import InfoIcon from '@mui/icons-material/Info'
 
 import { parseHighlightedText } from '../../../shared/lib/textParser'
+import { createRestaurantMarker, createUserMarker } from '../../../shared/lib/mapMarkers'
 import type { Coordinates, Restaurant } from '../../../shared/types'
 
 interface GroupContext {
@@ -123,30 +124,14 @@ const RestaurantCard = ({ restaurant, userLocation, groupContext }: RestaurantCa
         suppressMarkers: true,
       })
 
-      new window.google.maps.Marker({
-        position: { lat: userLocation.latitude, lng: userLocation.longitude },
-        map: mapInstanceRef.current,
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          scale: 10,
-          fillColor: '#4285F4',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 3,
-        },
-        title: '現在地',
-        zIndex: 1000,
-      })
+      createUserMarker(mapInstanceRef.current, { lat: userLocation.latitude, lng: userLocation.longitude }, { scale: 1.1 })
 
-      new window.google.maps.Marker({
-        position: { lat: restaurant.lat, lng: restaurant.lng },
-        map: mapInstanceRef.current,
-        icon: {
-          url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-        },
-        title: restaurant.name,
-        zIndex: 999,
-      })
+      createRestaurantMarker(
+        mapInstanceRef.current,
+        { lat: restaurant.lat, lng: restaurant.lng },
+        restaurant.name,
+        { scale: 1.1 },
+      )
 
       const origin: google.maps.LatLngLiteral = {
         lat: userLocation.latitude,

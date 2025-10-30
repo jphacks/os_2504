@@ -8,10 +8,16 @@ services:
     ports:
       - "8001:8001"
     environment:
+      - PYTHONPATH=/app
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:5173}
+      - DATABASE_URL=${DATABASE_URL_DOCKER:-mysql+aiomysql://foodfinder:foodfinder@mysql:3306/foodfinder}
+    working_dir: /app/backend
     volumes:
-      - ./backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+      - ./backend:/app/backend
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
+    depends_on:
+      - mysql
     networks:
       - mogufinder-network
 
@@ -29,6 +35,24 @@ services:
     networks:
       - mogufinder-network
 
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-foodfinder}
+      - MYSQL_USER=${MYSQL_USER:-foodfinder}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-foodfinder}
+    ports:
+      - "3306:3306"
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - mogufinder-network
+
 networks:
   mogufinder-network:
     driver: bridge
+
+volumes:
+  mysql-data:

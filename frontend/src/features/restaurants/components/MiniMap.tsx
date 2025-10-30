@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Box, CircularProgress, Typography } from '@mui/material'
 
+import { createRestaurantMarker, createUserMarker, updateMarkerPosition } from '../../../shared/lib/mapMarkers'
+
 interface MiniMapProps {
   userLocation?: google.maps.LatLngLiteral | null
   restaurantLocation?: google.maps.LatLngLiteral | null
@@ -14,7 +16,10 @@ const MiniMap = ({
 }: MiniMapProps): ReactElement => {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<google.maps.Map | null>(null)
-  const markersRef = useRef<{ user: google.maps.Marker | null; restaurant: google.maps.Marker | null }>({
+  const markersRef = useRef<{
+    user: google.maps.marker.AdvancedMarkerElement | null
+    restaurant: google.maps.marker.AdvancedMarkerElement | null
+  }>({
     user: null,
     restaurant: null,
   })
@@ -83,43 +88,18 @@ const MiniMap = ({
 
       if (userLocation) {
         if (markersRef.current.user) {
-          markersRef.current.user.setPosition(userLocation)
+          updateMarkerPosition(markersRef.current.user, userLocation)
         } else {
-          markersRef.current.user = new window.google.maps.Marker({
-            position: userLocation,
-            map,
-            title: '現在地',
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: '#4285F4',
-              fillOpacity: 1,
-              strokeColor: '#ffffff',
-              strokeWeight: 2,
-            },
-          })
+          markersRef.current.user = createUserMarker(map, userLocation, { scale: 0.9 })
         }
       }
 
       if (restaurantLocation) {
+        const title = restaurantName ?? 'レストラン'
         if (markersRef.current.restaurant) {
-          markersRef.current.restaurant.setPosition(restaurantLocation)
-          markersRef.current.restaurant.setTitle(restaurantName ?? 'レストラン')
+          updateMarkerPosition(markersRef.current.restaurant, restaurantLocation, title)
         } else {
-          markersRef.current.restaurant = new window.google.maps.Marker({
-            position: restaurantLocation,
-            map,
-            title: restaurantName ?? 'レストラン',
-            icon: {
-              path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-              scale: 6,
-              fillColor: '#EA4335',
-              fillOpacity: 1,
-              strokeColor: '#ffffff',
-              strokeWeight: 2,
-              rotation: 180,
-            },
-          })
+          markersRef.current.restaurant = createRestaurantMarker(map, restaurantLocation, title, { scale: 0.9 })
         }
 
         if (userLocation) {

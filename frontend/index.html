@@ -13,44 +13,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-    <script>
-      // Google Maps API グローバルコールバック
-      function initMap() {
-        console.log('Google Maps API loaded via callback');
-        window.googleMapsLoaded = true;
-        window.dispatchEvent(new Event('googleMapsLoaded'));
-      }
-      
-      // エラーハンドリング
-      function handleMapError() {
-        console.error('Failed to load Google Maps API');
-        window.googleMapsLoadError = true;
-        window.dispatchEvent(new Event('googleMapsLoadError'));
-      }
-      
-      window.initMap = initMap;
-      window.gm_authFailure = handleMapError; // Googleの認証失敗コールバック
-    </script>
-    <script type="module">
-      const loadGoogleMapsSdk = () => {
-        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-        if (!apiKey) {
-          console.error('VITE_GOOGLE_MAPS_API_KEY is not defined');
-          window.googleMapsLoadError = true;
-          window.dispatchEvent(new Event('googleMapsLoadError'));
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.async = true;
-        script.defer = true;
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initMap&libraries=places`;
-        script.onerror = window.handleMapError;
-        document.head.appendChild(script);
-      };
-
-      loadGoogleMapsSdk();
-    </script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
