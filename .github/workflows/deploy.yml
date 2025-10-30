@@ -1,0 +1,56 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ secrets.GCP_REGION }}
+  GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+  GOOGLE_API_KEY_PRODUCTION: ${{ secrets.GOOGLE_API_KEY_PRODUCTION }}
+  VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+  FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
+  ALLOWED_ORIGINS_PRODUCTION: ${{ secrets.ALLOWED_ORIGINS_PRODUCTION }}
+  CLOUD_SQL_SECRET_NAME: ${{ secrets.CLOUD_SQL_SECRET_NAME }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          install_components: beta
+
+      - name: Prepare .env for deploy script
+        run: |
+          cat <<'ENV' > .env
+          GCP_PROJECT_ID=${GCP_PROJECT_ID}
+          GCP_REGION=${GCP_REGION}
+          GOOGLE_API_KEY=${GOOGLE_API_KEY}
+          GOOGLE_API_KEY_PRODUCTION=${GOOGLE_API_KEY_PRODUCTION}
+          VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}
+          FRONTEND_BASE_URL=${FRONTEND_BASE_URL}
+          ALLOWED_ORIGINS_PRODUCTION=${ALLOWED_ORIGINS_PRODUCTION}
+          CLOUD_SQL_SECRET_NAME=${CLOUD_SQL_SECRET_NAME}
+          ENV
+
+      - name: Deploy backend and frontend
+        run: ./deploy.sh
+        env:
+          CLOUD_SQL_SECRET_NAME: ${{ env.CLOUD_SQL_SECRET_NAME }}
