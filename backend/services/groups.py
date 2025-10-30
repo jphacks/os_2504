@@ -1,12 +1,11 @@
-from datetime import datetime
 import secrets
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from backend.config import FRONTEND_BASE_URL
+from backend.repository import groups as group_repo
 from backend.schemas.groups import (
     CandidateResult,
     GroupCreateRequest,
@@ -21,7 +20,7 @@ from backend.schemas.restaurants import Restaurant, Review
 from . import restaurants as restaurant_service
 from .database import AsyncSessionLocal
 from .exceptions import ServiceError
-from .models import GroupMemberModel, GroupModel, GroupRestaurantModel, GroupVoteModel
+from .models import GroupModel, GroupRestaurantModel
 
 
 async def create_group(group_request: GroupCreateRequest, member_id: str) -> GroupCreateResponse:
@@ -42,13 +41,10 @@ async def create_group(group_request: GroupCreateRequest, member_id: str) -> Gro
                 max_price=preferences.max_price,
                 types=preferences.types or [],
                 status="voting",
-                created_at=datetime.utcnow(),
             )
-            session.add(group)
-            await session.flush()
-
-            session.add(GroupMemberModel(group_id=group_id, member_id=member_id))
-            session.add_all(_build_restaurant_models(group_id, restaurants))
+            await group_repo.add_group(session, group)
+            await group_repo.ensure_member(session, group_id, member_id)
+            await group_repo.add_restaurants(session, _build_restaurant_models(group_id, restaurants))
 
             await session.commit()
         except ServiceError:
@@ -77,19 +73,14 @@ async def create_group(group_request: GroupCreateRequest, member_id: str) -> Gro
 async def get_group_info(group_id: str, member_id: Optional[str]) -> GroupInfoResponse:
     async with AsyncSessionLocal() as session:
         try:
-            group = await session.get(GroupModel, group_id)
+            group = await group_repo.fetch_group(session, group_id)
             if not group:
                 raise ServiceError(404, "Group not found")
 
             if member_id:
-                await _ensure_member(session, group_id, member_id)
+                await group_repo.ensure_member(session, group_id, member_id)
 
-            members_query = await session.execute(
-                select(GroupMemberModel.member_id)
-                .where(GroupMemberModel.group_id == group_id)
-                .order_by(GroupMemberModel.member_id)
-            )
-            members = members_query.scalars().all()
+            members = await group_repo.fetch_member_ids(session, group_id)
 
             preferences = _preferences_from_group_model(group)
             await session.commit()
@@ -119,28 +110,16 @@ async def list_group_candidates(
 ) -> List[Restaurant]:
     async with AsyncSessionLocal() as session:
         try:
-            group = await session.get(GroupModel, group_id)
+            group = await group_repo.fetch_group(session, group_id)
             if not group:
                 raise ServiceError(404, "Group not found")
 
             voted_place_ids: set[str] = set()
             if member_id:
-                await _ensure_member(session, group_id, member_id)
-                voted_query = await session.execute(
-                    select(GroupVoteModel.place_id).where(
-                        GroupVoteModel.group_id == group_id,
-                        GroupVoteModel.member_id == member_id,
-                    )
-                )
-                voted_place_ids = set(voted_query.scalars().all())
+                await group_repo.ensure_member(session, group_id, member_id)
+                voted_place_ids = set(await group_repo.fetch_member_vote_place_ids(session, group_id, member_id))
 
-            restaurant_rows = (
-                await session.execute(
-                    select(GroupRestaurantModel)
-                    .where(GroupRestaurantModel.group_id == group_id)
-                    .order_by(GroupRestaurantModel.position)
-                )
-            ).scalars().all()
+            restaurant_rows = await group_repo.fetch_restaurants(session, group_id)
 
             restaurants = [_restaurant_from_model(row) for row in restaurant_rows]
             if voted_place_ids:
@@ -165,43 +144,23 @@ async def list_group_candidates(
 async def submit_vote(group_id: str, member_id: str, vote_request: VoteRequest) -> None:
     async with AsyncSessionLocal() as session:
         try:
-            group = await session.get(GroupModel, group_id)
+            group = await group_repo.fetch_group(session, group_id)
             if not group:
                 raise ServiceError(404, "Group not found")
             if group.status != "voting":
                 raise ServiceError(400, "Group is not accepting votes")
 
-            await _ensure_member(session, group_id, member_id)
+            await group_repo.ensure_member(session, group_id, member_id)
 
-            candidate_exists = await session.execute(
-                select(GroupRestaurantModel.id).where(
-                    GroupRestaurantModel.group_id == group_id,
-                    GroupRestaurantModel.place_id == vote_request.candidate_id,
-                )
-            )
-            if candidate_exists.scalar_one_or_none() is None:
+            if not await group_repo.candidate_exists(session, group_id, vote_request.candidate_id):
                 raise ServiceError(404, "Candidate not found")
 
-            existing_vote_query = await session.execute(
-                select(GroupVoteModel).where(
-                    GroupVoteModel.group_id == group_id,
-                    GroupVoteModel.member_id == member_id,
-                    GroupVoteModel.place_id == vote_request.candidate_id,
-                )
-            )
-            existing_vote = existing_vote_query.scalar_one_or_none()
+            existing_vote = await group_repo.get_vote(session, group_id, member_id, vote_request.candidate_id)
 
             if existing_vote:
                 existing_vote.value = vote_request.value
             else:
-                session.add(
-                    GroupVoteModel(
-                        group_id=group_id,
-                        member_id=member_id,
-                        place_id=vote_request.candidate_id,
-                        value=vote_request.value,
-                    )
-                )
+                await group_repo.create_vote(session, group_id, member_id, vote_request.candidate_id, vote_request.value)
 
             await session.commit()
         except ServiceError:
@@ -215,7 +174,7 @@ async def submit_vote(group_id: str, member_id: str, vote_request: VoteRequest) 
 async def finish_group(group_id: str, member_id: str) -> GroupResultsResponse:
     async with AsyncSessionLocal() as session:
         try:
-            group = await session.get(GroupModel, group_id)
+            group = await group_repo.fetch_group(session, group_id)
             if not group:
                 raise ServiceError(404, "Group not found")
             if group.organizer_id != member_id:
@@ -245,7 +204,7 @@ async def finish_group(group_id: str, member_id: str) -> GroupResultsResponse:
 async def get_group_results(group_id: str) -> GroupResultsResponse:
     async with AsyncSessionLocal() as session:
         try:
-            group = await session.get(GroupModel, group_id)
+            group = await group_repo.fetch_group(session, group_id)
             if not group:
                 raise ServiceError(404, "Group not found")
             if group.status != "finished":
@@ -270,23 +229,13 @@ async def get_group_results(group_id: str) -> GroupResultsResponse:
 async def _calculate_group_results(group_id: str) -> List[CandidateResult]:
     async with AsyncSessionLocal() as session:
         try:
-            restaurant_rows = (
-                await session.execute(
-                    select(GroupRestaurantModel)
-                    .where(GroupRestaurantModel.group_id == group_id)
-                    .order_by(GroupRestaurantModel.position)
-                )
-            ).scalars().all()
+            restaurant_rows = await group_repo.fetch_restaurants(session, group_id)
 
             restaurant_map: Dict[str, Restaurant] = {
                 row.place_id: _restaurant_from_model(row) for row in restaurant_rows
             }
 
-            vote_rows = (
-                await session.execute(
-                    select(GroupVoteModel.place_id, GroupVoteModel.value).where(GroupVoteModel.group_id == group_id)
-                )
-            ).all()
+            vote_rows = await group_repo.fetch_votes(session, group_id)
 
             counts: Dict[str, Dict[str, int]] = {}
             for place_id, value in vote_rows:
@@ -352,8 +301,7 @@ def _create_preferences_from_request(group_request: GroupCreateRequest) -> Searc
 async def _generate_unique_group_id(session) -> str:
     while True:
         candidate = secrets.token_urlsafe(6)
-        existing = await session.get(GroupModel, candidate)
-        if existing is None:
+        if not await group_repo.group_exists(session, candidate):
             return candidate
 
 
@@ -425,15 +373,3 @@ def _build_restaurant_models(group_id: str, restaurants: List[Restaurant]) -> Li
             )
         )
     return models
-
-
-async def _ensure_member(session, group_id: str, member_id: str) -> None:
-    result = await session.execute(
-        select(GroupMemberModel.id).where(
-            GroupMemberModel.group_id == group_id,
-            GroupMemberModel.member_id == member_id,
-        )
-    )
-    if result.scalar_one_or_none() is None:
-        session.add(GroupMemberModel(group_id=group_id, member_id=member_id))
-        await session.flush()
