@@ -32,6 +32,23 @@ if [ -z "$VITE_GOOGLE_MAPS_API_KEY" ]; then
   exit 1
 fi
 
+if [ -z "$CLOUD_SQL_INSTANCE" ] || [ -z "$CLOUD_SQL_DB" ] || [ -z "$CLOUD_SQL_USER" ] || [ -z "$CLOUD_SQL_PASSWORD" ]; then
+  echo "❌ エラー: CLOUD_SQL_INSTANCE / CLOUD_SQL_DB / CLOUD_SQL_USER / CLOUD_SQL_PASSWORD が設定されていません (.env を確認してください)"
+  exit 1
+fi
+
+# URL エンコード済みパスワードで Cloud SQL 用 DATABASE_URL を組み立て
+ENCODED_SQL_PASSWORD=$(python3 - <<'PY'
+import os
+from urllib.parse import quote
+
+password = os.environ["CLOUD_SQL_PASSWORD"]
+print(quote(password, safe=""))
+PY
+)
+
+DATABASE_URL="mysql+aiomysql://${CLOUD_SQL_USER}:${ENCODED_SQL_PASSWORD}@/${CLOUD_SQL_DB}?unix_socket=/cloudsql/${CLOUD_SQL_INSTANCE}"
+
 # プロジェクト設定
 echo "📝 プロジェクト設定..."
 gcloud config set project $PROJECT_ID
@@ -47,7 +64,8 @@ gcloud run deploy $BACKEND_SERVICE \
   --platform managed \
   --region $REGION \
   --allow-unauthenticated \
-  --set-env-vars GOOGLE_API_KEY=$GOOGLE_API_KEY,FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:5173} \
+  --set-cloudsql-instances $CLOUD_SQL_INSTANCE \
+  --set-env-vars DATABASE_URL=$DATABASE_URL,GOOGLE_API_KEY=$GOOGLE_API_KEY,FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:5173} \
   --memory 512Mi \
   --cpu 1 \
   --max-instances 10
@@ -92,7 +110,7 @@ echo "🔄 バックエンドのCORS設定を更新中..."
 gcloud run services update $BACKEND_SERVICE \
   --platform managed \
   --region $REGION \
-  --set-env-vars GOOGLE_API_KEY=$GOOGLE_API_KEY,ALLOWED_ORIGINS=$FRONTEND_URL,FRONTEND_BASE_URL=$FRONTEND_URL
+  --set-env-vars DATABASE_URL=$DATABASE_URL,GOOGLE_API_KEY=$GOOGLE_API_KEY,ALLOWED_ORIGINS=$FRONTEND_URL,FRONTEND_BASE_URL=$FRONTEND_URL
 
 echo ""
 echo "✨ デプロイ完了！"

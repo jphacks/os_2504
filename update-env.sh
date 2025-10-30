@@ -32,6 +32,24 @@ if [ -z "$GOOGLE_API_KEY_PRODUCTION" ]; then
   exit 1
 fi
 
+if [ -z "$CLOUD_SQL_INSTANCE" ] || [ -z "$CLOUD_SQL_DB" ] || [ -z "$CLOUD_SQL_USER" ] || [ -z "$CLOUD_SQL_PASSWORD" ]; then
+  echo "❌ エラー: CLOUD_SQL_INSTANCE / CLOUD_SQL_DB / CLOUD_SQL_USER / CLOUD_SQL_PASSWORD が .env に設定されていません"
+  exit 1
+fi
+
+DATABASE_URL=$(python3 - <<'PY'
+import os
+from urllib.parse import quote
+
+instance = os.environ["CLOUD_SQL_INSTANCE"]
+db = os.environ["CLOUD_SQL_DB"]
+user = os.environ["CLOUD_SQL_USER"]
+password = quote(os.environ["CLOUD_SQL_PASSWORD"], safe="")
+
+print(f"mysql+aiomysql://{user}:{password}@/{db}?unix_socket=/cloudsql/{instance}")
+PY
+)
+
 # フロントエンドのURLを取得
 echo "📍 フロントエンドのURLを取得中..."
 FRONTEND_URL=$(gcloud run services describe $FRONTEND_SERVICE \
@@ -52,7 +70,7 @@ echo "🔄 バックエンドの環境変数を更新中..."
 gcloud run services update $BACKEND_SERVICE \
   --platform managed \
   --region $REGION \
-  --set-env-vars "GOOGLE_API_KEY=$GOOGLE_API_KEY_PRODUCTION,ALLOWED_ORIGINS=$FRONTEND_URL,FRONTEND_BASE_URL=$FRONTEND_URL"
+  --set-env-vars "DATABASE_URL=$DATABASE_URL,GOOGLE_API_KEY=$GOOGLE_API_KEY_PRODUCTION,ALLOWED_ORIGINS=$FRONTEND_URL,FRONTEND_BASE_URL=$FRONTEND_URL"
 
 echo ""
 echo "✅ 環境変数の更新が完了しました"
