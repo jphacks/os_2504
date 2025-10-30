@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .database import Base
+from .base import Base
 
 
 class GroupModel(Base):

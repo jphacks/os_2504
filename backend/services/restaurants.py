@@ -2,6 +2,11 @@ from typing import List, Optional
 
 import httpx
 
+from backend.constants import (
+    REVIEW_LINE_TEMPLATE,
+    SUMMARY_CARD_PROMPT_TEMPLATE,
+    SUMMARY_DETAIL_PROMPT_TEMPLATE,
+)
 from backend.config import (
     GEMINI_API_URL,
     GOOGLE_API_KEY,
@@ -236,44 +241,26 @@ async def _generate_summary(restaurant_name: str, reviews: List[Review], format:
         return None
 
     reviews_text = "\n".join(
-        [f"- {review.author_name}さんの評価: {review.rating}点\n  {review.text}" for review in reviews]
+        [
+            REVIEW_LINE_TEMPLATE.format(
+                author_name=review.author_name,
+                rating=review.rating,
+                text=review.text,
+            )
+            for review in reviews
+        ]
     )
 
     if format == "detail":
-        prompt = f"""以下は「{restaurant_name}」というレストランのレビューです。
-これらのレビューを読んで、このレストランの魅力や特徴を100文字程度で簡潔にまとめてください。
-
-重要な指示：
-- 語尾は必ず「〜モグ」で終わらせてください。この語尾に自然に繋がるようにしてください。
-- 親しみやすく、明るい口調で書いてください
-- 改行を活用して見やすい文章にしてください
-- あなたが重要だと思ったキーワード（料理名、特徴、雰囲気など）は ***キーワード*** の形式で囲んでください
-  例: この店は***焼肉***が美味しくて、***雰囲気***も最高だモグ！
-
-レビュー:
-{reviews_text}
-
-まとめ:"""
+        prompt = SUMMARY_DETAIL_PROMPT_TEMPLATE.format(
+            restaurant_name=restaurant_name,
+            reviews_text=reviews_text,
+        )
     else:
-        prompt = f"""以下は「{restaurant_name}」というレストランのレビューです。
-これらのレビューを読んで、このレストランの魅力や特徴を短めの3つの箇条書きでまとめてください。
-
-重要な指示：
-- 必ず3つの要点を箇条書き形式で出力してください
-- 各要点は1行で、改行で区切ってください
-- 各行の最初に「・」などの記号は不要です
-- 親しみやすく、明るい口調で書いてください
-- 語尾は「〜モグ」で終わらせてください
-- あなたが重要だと思ったキーワード（料理名、特徴、雰囲気など）は ***キーワード*** の形式で囲んでください
-  例:
-  ***焼肉***が絶品で満足度高いモグ
-  ***雰囲気***が良くてデートにピッタリだモグ
-  ***コスパ***最高でリピート確定だモグ
-
-レビュー:
-{reviews_text}
-
-まとめ:"""
+        prompt = SUMMARY_CARD_PROMPT_TEMPLATE.format(
+            restaurant_name=restaurant_name,
+            reviews_text=reviews_text,
+        )
 
     async with httpx.AsyncClient() as client:
         try:

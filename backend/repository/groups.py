@@ -3,7 +3,7 @@ from typing import Iterable, List, Optional, Sequence, Tuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.services.models import GroupMemberModel, GroupModel, GroupRestaurantModel, GroupVoteModel
+from backend.models import GroupMemberModel, GroupModel, GroupRestaurantModel, GroupVoteModel
 
 
 async def group_exists(session: AsyncSession, group_id: str) -> bool:

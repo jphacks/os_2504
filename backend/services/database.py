@@ -3,13 +3,9 @@ from typing import AsyncGenerator
 
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
 
 from backend.config import DATABASE_URL
-
-
-class Base(DeclarativeBase):
-    pass
+from backend.models import Base
 
 
 engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
@@ -25,7 +21,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_models(max_attempts: int = 5, delay_seconds: float = 2.0) -> None:
-    from . import models  # noqa: F401  Ensures models are imported
+    from backend.models import group  # noqa: F401  Ensures models are imported
 
     attempt = 0
     while True:

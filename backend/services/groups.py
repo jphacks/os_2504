@@ -17,10 +17,11 @@ from backend.schemas.groups import (
 )
 from backend.schemas.restaurants import Restaurant, Review
 
+from backend.models import GroupModel, GroupRestaurantModel
+
 from . import restaurants as restaurant_service
 from .database import AsyncSessionLocal
 from .exceptions import ServiceError
-from .models import GroupModel, GroupRestaurantModel
 
 
 async def create_group(group_request: GroupCreateRequest, member_id: str) -> GroupCreateResponse:
