@@ -105,6 +105,7 @@ gcloud config set project $PROJECT_ID
 echo ""
 echo "🔧 バックエンドをビルド・デプロイ中..."
 gcloud builds submit ./backend \
+  --suppress-logs \
   --tag gcr.io/$PROJECT_ID/$BACKEND_SERVICE
 
 gcloud run deploy $BACKEND_SERVICE \
@@ -132,6 +133,7 @@ echo "🎨 フロントエンドをビルド・デプロイ中..."
 
 # フロントエンドのビルド（本番用Dockerfileを使用）
 gcloud builds submit ./frontend \
+  --suppress-logs \
   --config ./frontend/cloudbuild.yaml \
   --substitutions _VITE_API_URL=$BACKEND_URL,_VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY:-}
 
