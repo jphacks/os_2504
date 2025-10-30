@@ -8,12 +8,14 @@ services:
     ports:
       - "8001:8001"
     environment:
+      - PYTHONPATH=/app
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:5173}
       - DATABASE_URL=${DATABASE_URL_DOCKER:-mysql+aiomysql://foodfinder:foodfinder@mysql:3306/foodfinder}
+    working_dir: /app/backend
     volumes:
-      - ./backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+      - ./backend:/app/backend
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
     depends_on:
       - mysql
     networks:
