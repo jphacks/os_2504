@@ -1,0 +1,68 @@
+Table group_members {
+  id int [pk]
+  group_id varchar(32) [not null]
+  member_id varchar(64) [not null]
+  joined_at timestamp [not null]
+
+  Indexes {
+    (group_id, member_id) [unique, name: "uq_group_member"]
+  }
+}
+
+Table group_restaurants {
+  id int [pk]
+  group_id varchar(32) [not null]
+  place_id varchar(128) [not null]
+  position int [not null]
+  name varchar(255) [not null]
+  address varchar(255)
+  rating float
+  price_level int
+  photo_url text
+  photo_urls json
+  lat float [not null]
+  lng float [not null]
+  types json
+  reviews json
+  phone_number varchar(64)
+  website varchar(255)
+  google_maps_url varchar(255)
+  user_ratings_total int
+  opening_hours json
+  summary text
+
+  Indexes {
+    (group_id, place_id) [unique, name: "uq_group_restaurant"]
+  }
+}
+
+Table group_votes {
+  id int [pk]
+  group_id varchar(32) [not null]
+  member_id varchar(64) [not null]
+  place_id varchar(128) [not null]
+  value varchar(10) [not null]
+  created_at timestamp [not null]
+
+  Indexes {
+    (group_id, member_id, place_id) [unique, name: "uq_group_vote"]
+  }
+}
+
+Table groups {
+  id varchar(32) [pk]
+  group_name varchar(50)
+  organizer_id varchar(64) [not null]
+  latitude float [not null]
+  longitude float [not null]
+  radius int [not null]
+  min_price int
+  max_price int
+  types json
+  status varchar(20) [not null]
+  created_at timestamp [not null]
+}
+
+Ref: group_members.group_id > groups.id
+Ref: group_restaurants.group_id > groups.id
+Ref: group_votes.group_id > groups.id
