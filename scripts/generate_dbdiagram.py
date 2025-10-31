@@ -130,45 +130,62 @@ def build_table_section(table: Table) -> Sequence[str]:
     return lines
 
 
-def column_type_to_mermaid(column: Column) -> str:
-    """Convert a SQLAlchemy column type into a Mermaid-friendly string."""
+def column_type_to_mermaid(column: Column) -> Tuple[str, List[str]]:
+    """Convert a SQLAlchemy column type into a Mermaid-friendly string and extra details."""
     col_type = column.type
+    details: List[str] = []
 
     if isinstance(col_type, Text):
-        return "text"
+        return "text", details
     if isinstance(col_type, String):
         if col_type.length:
-            return f"varchar({col_type.length})"
-        return "varchar"
+            details.append(f"len={col_type.length}")
+        return "string", details
     if isinstance(col_type, Integer):
-        return "int"
+        return "int", details
     if isinstance(col_type, Float):
-        return "float"
+        return "float", details
     if isinstance(col_type, Boolean):
-        return "bool"
+        return "bool", details
     if isinstance(col_type, DateTime):
-        return "timestamp"
+        return "datetime", details
     if isinstance(col_type, Numeric):
-        return "numeric"
+        precision = getattr(col_type, "precision", None)
+        scale = getattr(col_type, "scale", None)
+        if precision is not None:
+            if scale is not None:
+                details.append(f"prec={precision},scale={scale}")
+            else:
+                details.append(f"prec={precision}")
+        return "numeric", details
     if isinstance(col_type, LargeBinary):
-        return "binary"
+        return "binary", details
     if col_type.__class__.__name__.lower() == "json":
-        return "json"
-    return str(col_type).lower()
+        return "json", details
+    type_name = str(col_type).lower()
+    return type_name, details
 
 
-def format_mermaid_attributes(column: Column) -> str:
+def format_mermaid_attributes(column: Column, details: List[str]) -> Tuple[str, str]:
     """Return suffix tokens for Mermaid based on column attributes."""
-    attributes: List[str] = []
+    attribute_tokens: List[str] = []
+    comment_parts: List[str] = details[:]
     if column.primary_key:
-        attributes.append("PK")
-    elif not column.nullable:
-        attributes.append("NN")
-    if getattr(column, "unique", False):
-        attributes.append("UQ")
-    if not attributes:
-        return ""
-    return " " + " ".join(attributes)
+        attribute_tokens.append("PK")
+    else:
+        if not column.nullable:
+            comment_parts.append("not null")
+        if getattr(column, "unique", False):
+            comment_parts.append("unique")
+
+    attribute_suffix = ""
+    if attribute_tokens:
+        attribute_suffix = " " + " ".join(attribute_tokens)
+
+    comment_suffix = ""
+    if comment_parts:
+        comment_suffix = f' "{", ".join(comment_parts)}"'
+    return attribute_suffix, comment_suffix
 
 
 def build_mermaid_entities(tables: Sequence[Table]) -> List[str]:
@@ -177,9 +194,9 @@ def build_mermaid_entities(tables: Sequence[Table]) -> List[str]:
     for table in tables:
         lines.append(f"    {table.name} {{")
         for column in table.columns:
-            column_line = (
-                f"        {column_type_to_mermaid(column)} {column.name}{format_mermaid_attributes(column)}"
-            )
+            mermaid_type, details = column_type_to_mermaid(column)
+            attribute_suffix, comment_suffix = format_mermaid_attributes(column, details)
+            column_line = f"        {mermaid_type} {column.name}{attribute_suffix}{comment_suffix}"
             lines.append(column_line)
         lines.append("    }")
     return lines

@@ -1,6 +1,7 @@
 # 開発ドキュメント
 
 ## データベース ER 図
+- Mermaid 図ファイル: [`schema.mmd`](./schema.mmd)
 - DBML ファイル: [`schema.dbml`](./schema.dbml)
 - 表示方法: dbdiagram.io などの DBML 対応ツールに上記ファイルを読み込むと ER 図として閲覧できます。
 - 更新手順（プロジェクトルートで実行）:
@@ -18,52 +19,52 @@
 erDiagram
     group_members {
         int id PK
-        varchar(32) group_id NN
-        varchar(64) member_id NN
-        timestamp joined_at NN
+        string group_id "len=32, not null"
+        string member_id "len=64, not null"
+        datetime joined_at "not null"
     }
     group_restaurants {
         int id PK
-        varchar(32) group_id NN
-        varchar(128) place_id NN
-        int position NN
-        varchar(255) name NN
-        varchar(255) address
+        string group_id "len=32, not null"
+        string place_id "len=128, not null"
+        int position "not null"
+        string name "len=255, not null"
+        string address "len=255"
         float rating
         int price_level
         text photo_url
         json photo_urls
-        float lat NN
-        float lng NN
+        float lat "not null"
+        float lng "not null"
         json types
         json reviews
-        varchar(64) phone_number
-        varchar(255) website
-        varchar(255) google_maps_url
+        string phone_number "len=64"
+        string website "len=255"
+        string google_maps_url "len=255"
         int user_ratings_total
         json opening_hours
         text summary
     }
     group_votes {
         int id PK
-        varchar(32) group_id NN
-        varchar(64) member_id NN
-        varchar(128) place_id NN
-        varchar(10) value NN
-        timestamp created_at NN
+        string group_id "len=32, not null"
+        string member_id "len=64, not null"
+        string place_id "len=128, not null"
+        string value "len=10, not null"
+        datetime created_at "not null"
     }
     groups {
-        varchar(32) id PK
-        varchar(50) group_name
-        varchar(64) organizer_id NN
-        float latitude NN
-        float longitude NN
-        int radius NN
+        string id PK "len=32"
+        string group_name "len=50"
+        string organizer_id "len=64, not null"
+        float latitude "not null"
+        float longitude "not null"
+        int radius "not null"
         int min_price
         int max_price
         json types
-        varchar(20) status NN
-        timestamp created_at NN
+        string status "len=20, not null"
+        datetime created_at "not null"
     }
 
     groups ||--o{ group_members : "group_id"
