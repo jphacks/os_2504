@@ -56,4 +56,10 @@ jobs:
           python scripts/generate_api_docs.py
 
       - name: Check docs are up to date
-        run: git diff --exit-code documents/schema.dbml documents/api/openapi.json documents/api/swagger.html
+        run: |
+          git diff --exit-code \
+            documents/schema.dbml \
+            documents/schema.mmd \
+            documents/README.md \
+            documents/api/openapi.json \
+            documents/api/swagger.html
