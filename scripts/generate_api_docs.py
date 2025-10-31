@@ -44,7 +44,8 @@ def main() -> None:
 <head>
   <meta charset="utf-8" />
   <title>MogFinder API Reference</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
+  <link rel="icon" type="image/png" href="https://petstore.swagger.io/favicon-32x32.png" />
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" crossorigin="anonymous" />
   <style>
     body {{
       margin: 0;
@@ -54,16 +55,27 @@ def main() -> None:
 </head>
 <body>
   <div id="swagger-ui"></div>
-  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js" crossorigin="anonymous"></script>
   <script>
   window.addEventListener('load', () => {{
+    if (!window.SwaggerUIBundle) {{
+      document.getElementById('swagger-ui').innerHTML = '<p style="padding:16px;color:#b91c1c;">Swagger UI scriptsの読み込みに失敗しました。ネットワーク設定を確認してください。</p>';
+      return;
+    }}
     const spec = {openapi_js};
-    SwaggerUIBundle({{
+    const presetList = window.SwaggerUIBundle.presets && window.SwaggerUIBundle.presets.apis
+      ? [window.SwaggerUIBundle.presets.apis]
+      : undefined;
+    const options = {{
       spec,
       dom_id: '#swagger-ui',
-      presets: [SwaggerUIBundle.presets.apis],
       layout: 'BaseLayout'
-    }});
+    }};
+    if (presetList) {{
+      options.presets = presetList;
+    }}
+    window.SwaggerUIBundle(options);
   }});
   </script>
 </body>
