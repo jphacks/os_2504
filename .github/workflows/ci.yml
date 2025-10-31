@@ -49,3 +49,11 @@ jobs:
 
       - name: Compile sources
         run: python -m compileall backend
+
+      - name: Generate database and API docs
+        run: |
+          python scripts/generate_dbdiagram.py
+          python scripts/generate_api_docs.py
+
+      - name: Check docs are up to date
+        run: git diff --exit-code documents/schema.dbml documents/api/openapi.json documents/api/swagger.html
