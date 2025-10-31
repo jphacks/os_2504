@@ -76,6 +76,8 @@ erDiagram
 ## API ドキュメント
 - Swagger UI HTML: [`api/swagger.html`](./api/swagger.html)
 - OpenAPI JSON: [`api/openapi.json`](./api/openapi.json)
+- GitHub 上でのクイックプレビュー（`main` ブランチ）:  
+  https://htmlpreview.github.io/?https://raw.githubusercontent.com/jphacks/os_2504/main/documents/api/swagger.html
 - 更新手順（プロジェクトルートで実行）:
   ```bash
   python scripts/generate_api_docs.py
