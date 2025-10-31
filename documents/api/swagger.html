@@ -1,630 +1,130 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <title>MogFinder API Reference</title>
-  <link rel="icon" type="image/png" href="https://petstore.swagger.io/favicon-32x32.png" />
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" crossorigin="anonymous" />
-  <style>
-    body {
-      margin: 0;
-      background-color: #fafafa;
-    }
-  </style>
+    <meta charset="utf-8" />
+    <title>FastAPI - Swagger UI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="https://petstore.swagger.io/favicon-32x32.png" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow-y: scroll;
+        }
+        *, *::before, *::after {
+            box-sizing: inherit;
+        }
+        body {
+            margin: 0;
+            background: #f8fafc;
+        }
+    </style>
 </head>
 <body>
-  <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js" crossorigin="anonymous"></script>
-  <script>
-  window.addEventListener('load', () => {
-    if (!window.SwaggerUIBundle) {
-      document.getElementById('swagger-ui').innerHTML = '<p style="padding:16px;color:#b91c1c;">Swagger UI scriptsの読み込みに失敗しました。ネットワーク設定を確認してください。</p>';
-      return;
-    }
-    const spec = {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "FastAPI",
-    "version": "0.1.0"
-  },
-  "paths": {
-    "/api/groups": {
-      "post": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Create Group",
-        "operationId": "create_group_api_groups_post",
-        "parameters": [
-          {
-            "name": "member_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "description": "作成者のメンバーID",
-              "title": "Member Id"
-            },
-            "description": "作成者のメンバーID"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GroupCreateRequest"
-              }
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function () {
+            if (!window.SwaggerUIBundle) {
+                document.getElementById('swagger-ui').innerHTML =
+                    '<p style="padding:16px;color:#b91c1c;">Swagger UI の読み込みに失敗しました。</p>';
+                return;
             }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GroupCreateResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/groups/{group_id}": {
-      "get": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Get Group",
-        "operationId": "get_group_api_groups__group_id__get",
-        "parameters": [
-          {
-            "name": "group_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Group Id"
-            }
-          },
-          {
-            "name": "member_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "参加者のメンバーID",
-              "title": "Member Id"
-            },
-            "description": "参加者のメンバーID"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GroupInfoResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/groups/{group_id}/candidates": {
-      "get": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Get Group Candidates",
-        "operationId": "get_group_candidates_api_groups__group_id__candidates_get",
-        "parameters": [
-          {
-            "name": "group_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Group Id"
-            }
-          },
-          {
-            "name": "member_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Member Id"
-            }
-          },
-          {
-            "name": "start",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "候補の開始インデックス",
-              "default": 0,
-              "title": "Start"
-            },
-            "description": "候補の開始インデックス"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 50,
-              "minimum": 1,
-              "description": "取得する件数",
-              "default": 20,
-              "title": "Limit"
-            },
-            "description": "取得する件数"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Restaurant"
-                  },
-                  "title": "Response Get Group Candidates Api Groups  Group Id  Candidates Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/groups/{group_id}/vote": {
-      "post": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Submit Vote",
-        "operationId": "submit_vote_api_groups__group_id__vote_post",
-        "parameters": [
-          {
-            "name": "group_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Group Id"
-            }
-          },
-          {
-            "name": "member_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "title": "Member Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VoteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Submit Vote Api Groups  Group Id  Vote Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/groups/{group_id}/finish": {
-      "post": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Finish Group",
-        "operationId": "finish_group_api_groups__group_id__finish_post",
-        "parameters": [
-          {
-            "name": "group_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Group Id"
-            }
-          },
-          {
-            "name": "member_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "title": "Member Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GroupResultsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/groups/{group_id}/results": {
-      "get": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Get Group Results",
-        "operationId": "get_group_results_api_groups__group_id__results_get",
-        "parameters": [
-          {
-            "name": "group_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Group Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GroupResultsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/restaurants/search": {
-      "post": {
-        "tags": [
-          "restaurants"
-        ],
-        "summary": "Search Restaurants",
-        "operationId": "search_restaurants_api_restaurants_search_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchPreferences"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/Restaurant"
-                  },
-                  "type": "array",
-                  "title": "Response Search Restaurants Api Restaurants Search Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/restaurants/{place_id}": {
-      "get": {
-        "tags": [
-          "restaurants"
-        ],
-        "summary": "Get Restaurant Details",
-        "operationId": "get_restaurant_details_api_restaurants__place_id__get",
-        "parameters": [
-          {
-            "name": "place_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Place Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Restaurant"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/restaurants/summarize": {
-      "post": {
-        "tags": [
-          "restaurants"
-        ],
-        "summary": "Summarize Restaurant",
-        "operationId": "summarize_restaurant_api_restaurants_summarize_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SummarizeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Summarize Restaurant Api Restaurants Summarize Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/": {
-      "get": {
-        "summary": "Root",
-        "operationId": "root__get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    }
-  },
+            const spec = {
   "components": {
     "schemas": {
       "CandidateResult": {
         "properties": {
+          "dislikes": {
+            "title": "Dislikes",
+            "type": "integer"
+          },
+          "likes": {
+            "title": "Likes",
+            "type": "integer"
+          },
           "restaurant": {
             "$ref": "#/components/schemas/Restaurant"
           },
           "score": {
-            "type": "number",
-            "title": "Score"
-          },
-          "likes": {
-            "type": "integer",
-            "title": "Likes"
-          },
-          "dislikes": {
-            "type": "integer",
-            "title": "Dislikes"
+            "title": "Score",
+            "type": "number"
           }
         },
-        "type": "object",
         "required": [
           "restaurant",
           "score",
           "likes",
           "dislikes"
         ],
-        "title": "CandidateResult"
+        "title": "CandidateResult",
+        "type": "object"
       },
       "GroupCreateRequest": {
         "properties": {
-          "latitude": {
-            "type": "number",
-            "maximum": 90.0,
-            "minimum": -90.0,
-            "title": "Latitude",
-            "description": "緯度（-90〜90）"
-          },
-          "longitude": {
-            "type": "number",
-            "maximum": 180.0,
-            "minimum": -180.0,
-            "title": "Longitude",
-            "description": "経度（-180〜180）"
-          },
-          "radius": {
-            "type": "integer",
-            "maximum": 5000.0,
-            "minimum": 100.0,
-            "title": "Radius",
-            "description": "検索半径（100〜5000m）",
-            "default": 1000
-          },
-          "min_price": {
+          "group_name": {
             "anyOf": [
               {
-                "type": "integer",
-                "maximum": 4.0,
-                "minimum": 0.0
+                "maxLength": 50,
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Min Price",
-            "default": 0
+            "description": "グループ名（任意）",
+            "title": "Group Name"
+          },
+          "latitude": {
+            "description": "緯度（-90〜90）",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude",
+            "type": "number"
+          },
+          "longitude": {
+            "description": "経度（-180〜180）",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude",
+            "type": "number"
           },
           "max_price": {
             "anyOf": [
               {
-                "type": "integer",
                 "maximum": 4.0,
-                "minimum": 0.0
+                "minimum": 0.0,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Max Price",
-            "default": 4
+            "default": 4,
+            "title": "Max Price"
+          },
+          "min_price": {
+            "anyOf": [
+              {
+                "maximum": 4.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 0,
+            "title": "Min Price"
+          },
+          "radius": {
+            "default": 1000,
+            "description": "検索半径（100〜5000m）",
+            "maximum": 5000.0,
+            "minimum": 100.0,
+            "title": "Radius",
+            "type": "integer"
           },
           "types": {
             "anyOf": [
@@ -639,45 +139,20 @@
               }
             ],
             "title": "Types"
-          },
-          "group_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Group Name",
-            "description": "グループ名（任意）"
           }
         },
-        "type": "object",
         "required": [
           "latitude",
           "longitude"
         ],
-        "title": "GroupCreateRequest"
+        "title": "GroupCreateRequest",
+        "type": "object"
       },
       "GroupCreateResponse": {
         "properties": {
           "group_id": {
-            "type": "string",
-            "title": "Group Id"
-          },
-          "invite_url": {
-            "type": "string",
-            "title": "Invite Url"
-          },
-          "organizer_id": {
-            "type": "string",
-            "title": "Organizer Id"
-          },
-          "organizer_join_url": {
-            "type": "string",
-            "title": "Organizer Join Url"
+            "title": "Group Id",
+            "type": "string"
           },
           "group_name": {
             "anyOf": [
@@ -689,45 +164,39 @@
               }
             ],
             "title": "Group Name"
+          },
+          "invite_url": {
+            "title": "Invite Url",
+            "type": "string"
+          },
+          "organizer_id": {
+            "title": "Organizer Id",
+            "type": "string"
+          },
+          "organizer_join_url": {
+            "title": "Organizer Join Url",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
           "group_id",
           "invite_url",
           "organizer_id",
           "organizer_join_url"
         ],
-        "title": "GroupCreateResponse"
+        "title": "GroupCreateResponse",
+        "type": "object"
       },
       "GroupInfoResponse": {
         "properties": {
-          "group_id": {
-            "type": "string",
-            "title": "Group Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "organizer_id": {
-            "type": "string",
-            "title": "Organizer Id"
-          },
-          "members": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Members"
-          },
           "created_at": {
-            "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "type": "string"
           },
-          "preferences": {
-            "$ref": "#/components/schemas/SearchPreferences"
+          "group_id": {
+            "title": "Group Id",
+            "type": "string"
           },
           "group_name": {
             "anyOf": [
@@ -739,9 +208,26 @@
               }
             ],
             "title": "Group Name"
+          },
+          "members": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "organizer_id": {
+            "title": "Organizer Id",
+            "type": "string"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/SearchPreferences"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
           "group_id",
           "status",
@@ -750,33 +236,34 @@
           "created_at",
           "preferences"
         ],
-        "title": "GroupInfoResponse"
+        "title": "GroupInfoResponse",
+        "type": "object"
       },
       "GroupResultsResponse": {
         "properties": {
           "group_id": {
-            "type": "string",
-            "title": "Group Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
+            "title": "Group Id",
+            "type": "string"
           },
           "results": {
             "items": {
               "$ref": "#/components/schemas/CandidateResult"
             },
-            "type": "array",
-            "title": "Results"
+            "title": "Results",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
           "group_id",
           "status",
           "results"
         ],
-        "title": "GroupResultsResponse"
+        "title": "GroupResultsResponse",
+        "type": "object"
       },
       "HTTPValidationError": {
         "properties": {
@@ -784,48 +271,64 @@
             "items": {
               "$ref": "#/components/schemas/ValidationError"
             },
-            "type": "array",
-            "title": "Detail"
+            "title": "Detail",
+            "type": "array"
           }
         },
-        "type": "object",
-        "title": "HTTPValidationError"
+        "title": "HTTPValidationError",
+        "type": "object"
       },
       "Restaurant": {
         "properties": {
-          "place_id": {
-            "type": "string",
-            "title": "Place Id"
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "google_maps_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Google Maps Url"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lng": {
+            "title": "Lng",
+            "type": "number"
           },
           "name": {
-            "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "type": "string"
           },
-          "address": {
-            "type": "string",
-            "title": "Address"
-          },
-          "rating": {
+          "opening_hours": {
             "anyOf": [
               {
-                "type": "number"
+                "additionalProperties": true,
+                "type": "object"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Rating"
+            "title": "Opening Hours"
           },
-          "price_level": {
+          "phone_number": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Price Level"
+            "title": "Phone Number"
           },
           "photo_url": {
             "anyOf": [
@@ -852,20 +355,31 @@
             ],
             "title": "Photo Urls"
           },
-          "lat": {
-            "type": "number",
-            "title": "Lat"
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
           },
-          "lng": {
-            "type": "number",
-            "title": "Lng"
+          "price_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Level"
           },
-          "types": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Types"
+          "rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
           },
           "reviews": {
             "anyOf": [
@@ -881,7 +395,7 @@
             ],
             "title": "Reviews"
           },
-          "phone_number": {
+          "summary": {
             "anyOf": [
               {
                 "type": "string"
@@ -890,29 +404,14 @@
                 "type": "null"
               }
             ],
-            "title": "Phone Number"
+            "title": "Summary"
           },
-          "website": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Website"
-          },
-          "google_maps_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Google Maps Url"
+          "types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Types",
+            "type": "array"
           },
           "user_ratings_total": {
             "anyOf": [
@@ -925,19 +424,7 @@
             ],
             "title": "User Ratings Total"
           },
-          "opening_hours": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Opening Hours"
-          },
-          "summary": {
+          "website": {
             "anyOf": [
               {
                 "type": "string"
@@ -946,10 +433,9 @@
                 "type": "null"
               }
             ],
-            "title": "Summary"
+            "title": "Website"
           }
         },
-        "type": "object",
         "required": [
           "place_id",
           "name",
@@ -961,87 +447,88 @@
           "lng",
           "types"
         ],
-        "title": "Restaurant"
+        "title": "Restaurant",
+        "type": "object"
       },
       "Review": {
         "properties": {
           "author_name": {
-            "type": "string",
-            "title": "Author Name"
+            "title": "Author Name",
+            "type": "string"
           },
           "rating": {
-            "type": "integer",
-            "title": "Rating"
+            "title": "Rating",
+            "type": "integer"
           },
           "text": {
-            "type": "string",
-            "title": "Text"
+            "title": "Text",
+            "type": "string"
           },
           "time": {
-            "type": "string",
-            "title": "Time"
+            "title": "Time",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
           "author_name",
           "rating",
           "text",
           "time"
         ],
-        "title": "Review"
+        "title": "Review",
+        "type": "object"
       },
       "SearchPreferences": {
         "properties": {
           "latitude": {
-            "type": "number",
+            "description": "緯度（-90〜90）",
             "maximum": 90.0,
             "minimum": -90.0,
             "title": "Latitude",
-            "description": "緯度（-90〜90）"
+            "type": "number"
           },
           "longitude": {
-            "type": "number",
+            "description": "経度（-180〜180）",
             "maximum": 180.0,
             "minimum": -180.0,
             "title": "Longitude",
-            "description": "経度（-180〜180）"
-          },
-          "radius": {
-            "type": "integer",
-            "maximum": 5000.0,
-            "minimum": 100.0,
-            "title": "Radius",
-            "description": "検索半径（100〜5000m）",
-            "default": 1000
-          },
-          "min_price": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 4.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Min Price",
-            "default": 0
+            "type": "number"
           },
           "max_price": {
             "anyOf": [
               {
-                "type": "integer",
                 "maximum": 4.0,
-                "minimum": 0.0
+                "minimum": 0.0,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Max Price",
-            "default": 4
+            "default": 4,
+            "title": "Max Price"
+          },
+          "min_price": {
+            "anyOf": [
+              {
+                "maximum": 4.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 0,
+            "title": "Min Price"
+          },
+          "radius": {
+            "default": 1000,
+            "description": "検索半径（100〜5000m）",
+            "maximum": 5000.0,
+            "minimum": 100.0,
+            "title": "Radius",
+            "type": "integer"
           },
           "types": {
             "anyOf": [
@@ -1058,26 +545,15 @@
             "title": "Types"
           }
         },
-        "type": "object",
         "required": [
           "latitude",
           "longitude"
         ],
-        "title": "SearchPreferences"
+        "title": "SearchPreferences",
+        "type": "object"
       },
       "SummarizeRequest": {
         "properties": {
-          "restaurant_name": {
-            "type": "string",
-            "title": "Restaurant Name"
-          },
-          "reviews": {
-            "items": {
-              "$ref": "#/components/schemas/Review"
-            },
-            "type": "array",
-            "title": "Reviews"
-          },
           "format": {
             "anyOf": [
               {
@@ -1087,16 +563,27 @@
                 "type": "null"
               }
             ],
-            "title": "Format",
-            "default": "card"
+            "default": "card",
+            "title": "Format"
+          },
+          "restaurant_name": {
+            "title": "Restaurant Name",
+            "type": "string"
+          },
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/Review"
+            },
+            "title": "Reviews",
+            "type": "array"
           }
         },
-        "type": "object",
         "required": [
           "restaurant_name",
           "reviews"
         ],
-        "title": "SummarizeRequest"
+        "title": "SummarizeRequest",
+        "type": "object"
       },
       "ValidationError": {
         "properties": {
@@ -1111,64 +598,587 @@
                 }
               ]
             },
-            "type": "array",
-            "title": "Location"
+            "title": "Location",
+            "type": "array"
           },
           "msg": {
-            "type": "string",
-            "title": "Message"
+            "title": "Message",
+            "type": "string"
           },
           "type": {
-            "type": "string",
-            "title": "Error Type"
+            "title": "Error Type",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
           "loc",
           "msg",
           "type"
         ],
-        "title": "ValidationError"
+        "title": "ValidationError",
+        "type": "object"
       },
       "VoteRequest": {
         "properties": {
           "candidate_id": {
-            "type": "string",
-            "title": "Candidate Id"
+            "title": "Candidate Id",
+            "type": "string"
           },
           "value": {
-            "type": "string",
             "enum": [
               "like",
               "dislike"
             ],
-            "title": "Value"
+            "title": "Value",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
           "candidate_id",
           "value"
         ],
-        "title": "VoteRequest"
+        "title": "VoteRequest",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Root"
+      }
+    },
+    "/api/groups": {
+      "post": {
+        "operationId": "create_group_api_groups_post",
+        "parameters": [
+          {
+            "description": "作成者のメンバーID",
+            "in": "query",
+            "name": "member_id",
+            "required": true,
+            "schema": {
+              "description": "作成者のメンバーID",
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Member Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupCreateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Group",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
+    "/api/groups/{group_id}": {
+      "get": {
+        "operationId": "get_group_api_groups__group_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "参加者のメンバーID",
+            "in": "query",
+            "name": "member_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "参加者のメンバーID",
+              "title": "Member Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupInfoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Group",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
+    "/api/groups/{group_id}/candidates": {
+      "get": {
+        "operationId": "get_group_candidates_api_groups__group_id__candidates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "member_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Member Id"
+            }
+          },
+          {
+            "description": "候補の開始インデックス",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "候補の開始インデックス",
+              "minimum": 0,
+              "title": "Start",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "取得する件数",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "description": "取得する件数",
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Restaurant"
+                  },
+                  "title": "Response Get Group Candidates Api Groups  Group Id  Candidates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Group Candidates",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
+    "/api/groups/{group_id}/finish": {
+      "post": {
+        "operationId": "finish_group_api_groups__group_id__finish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "member_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Member Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupResultsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finish Group",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
+    "/api/groups/{group_id}/results": {
+      "get": {
+        "operationId": "get_group_results_api_groups__group_id__results_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupResultsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Group Results",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
+    "/api/groups/{group_id}/vote": {
+      "post": {
+        "operationId": "submit_vote_api_groups__group_id__vote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "member_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Member Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Submit Vote Api Groups  Group Id  Vote Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Vote",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
+    "/api/restaurants/search": {
+      "post": {
+        "operationId": "search_restaurants_api_restaurants_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchPreferences"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Restaurant"
+                  },
+                  "title": "Response Search Restaurants Api Restaurants Search Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Restaurants",
+        "tags": [
+          "restaurants"
+        ]
+      }
+    },
+    "/api/restaurants/summarize": {
+      "post": {
+        "operationId": "summarize_restaurant_api_restaurants_summarize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SummarizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Summarize Restaurant Api Restaurants Summarize Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Summarize Restaurant",
+        "tags": [
+          "restaurants"
+        ]
+      }
+    },
+    "/api/restaurants/{place_id}": {
+      "get": {
+        "operationId": "get_restaurant_details_api_restaurants__place_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "place_id",
+            "required": true,
+            "schema": {
+              "title": "Place Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Restaurant"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Restaurant Details",
+        "tags": [
+          "restaurants"
+        ]
       }
     }
   }
 };
-    const presetList = window.SwaggerUIBundle.presets && window.SwaggerUIBundle.presets.apis
-      ? [window.SwaggerUIBundle.presets.apis]
-      : undefined;
-    const options = {
-      spec,
-      dom_id: '#swagger-ui',
-      layout: 'BaseLayout'
-    };
-    if (presetList) {
-      options.presets = presetList;
-    }
-    window.SwaggerUIBundle(options);
-  });
-  </script>
+            window.ui = SwaggerUIBundle({
+                spec: spec,
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: 'StandaloneLayout'
+            });
+        };
+    </script>
 </body>
 </html>
