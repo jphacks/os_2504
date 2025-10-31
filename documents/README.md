@@ -80,8 +80,9 @@ erDiagram
   https://htmlpreview.github.io/?https://raw.githubusercontent.com/jphacks/os_2504/main/documents/api/swagger.html
 - 更新手順（プロジェクトルートで実行）:
   ```bash
-  python scripts/generate_api_docs.py
+  python backend/scripts/export_swagger.py
   ```
+  ※ 互換ラッパーとして `python scripts/generate_api_docs.py` でも同じ成果物が生成できます。  
   こちらも CI が生成＆差分検知を行います。
 
 ## 補足

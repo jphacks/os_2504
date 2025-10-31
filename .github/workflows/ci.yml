@@ -53,7 +53,7 @@ jobs:
       - name: Generate database and API docs
         run: |
           python scripts/generate_dbdiagram.py
-          python scripts/generate_api_docs.py
+          python backend/scripts/export_swagger.py
 
       - name: Check docs are up to date
         run: |
