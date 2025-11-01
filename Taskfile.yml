@@ -1,0 +1,91 @@
+version: "3"
+
+dotenv:
+  - .env
+
+tasks:
+  default:
+    desc: 主要なタスク一覧を表示
+    cmds:
+      - task --list
+
+  docker:up:
+    desc: Docker Compose をビルド付きでバックグラウンド起動
+    cmds:
+      - docker compose up -d --build
+
+  docker:down:
+    desc: 起動中の Docker コンテナを停止・削除
+    cmds:
+      - docker compose down
+
+  docker:logs:
+    desc: backend と mysql のログをフォロー表示
+    cmds:
+      - docker compose logs -f backend mysql
+
+  deps:backend:
+    desc: backend イメージをビルドし Python 依存関係をコンテナに準備
+    cmds:
+      - docker compose build backend
+
+  deps:frontend:
+    desc: frontend コンテナ内で npm install を実行
+    cmds:
+      - |
+        docker compose run --rm --no-deps frontend npm install
+
+  dev:backend:
+    desc: backend コンテナをホットリロードで起動
+    interactive: true
+    cmds:
+      - docker compose up backend
+
+  dev:frontend:
+    desc: frontend コンテナを起動
+    interactive: true
+    cmds:
+      - docker compose up frontend
+
+  db:init:
+    desc: SQLAlchemy モデルからテーブルを作成（初期化）
+    cmds:
+      - docker compose up -d mysql
+      - |
+        docker compose run --rm backend bash -lc 'python - <<'"'"'PY'"'"'
+        import asyncio
+        from backend.services.database import init_models, shutdown_engine
+
+        async def main():
+            await init_models()
+            await shutdown_engine()
+
+        asyncio.run(main())
+        PY'
+
+  db:migrate:
+    desc: モデル変更を反映（現状は init_models を再実行）
+    cmds:
+      - task db:init
+
+  db:revision:
+    desc: Alembic リビジョンを作成（alembic.ini がある場合）
+    cmds:
+      - |
+        set -e
+        if [ ! -f alembic.ini ]; then
+          echo "alembic.ini が存在しないためリビジョンを作成できません。Alembic の初期化後に再実行してください。"
+          exit 1
+        fi
+        docker compose run --rm backend alembic revision --autogenerate -m "${MESSAGE:-autogenerate}"
+
+  db:upgrade:
+    desc: Alembic で最新リビジョンまでマイグレーションを適用
+    cmds:
+      - |
+        set -e
+        if [ ! -f alembic.ini ]; then
+          echo "alembic.ini が存在しないためマイグレーションを適用できません。Alembic の初期化後に再実行してください。"
+          exit 1
+        fi
+        docker compose run --rm backend alembic upgrade head
