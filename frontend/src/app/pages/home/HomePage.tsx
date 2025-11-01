@@ -16,6 +16,7 @@ import {
 } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import MyLocationIcon from '@mui/icons-material/MyLocation'
+import MapIcon from '@mui/icons-material/Map'
 import { useNavigate } from 'react-router-dom'
 
 import AppHeader from '../../components/AppHeader'
@@ -25,6 +26,7 @@ import { createGroup } from '../../../shared/lib/api/groups'
 import { saveGroupMemberId } from '../../../shared/lib/storage/localStorage'
 import { buildQrSource, generateMemberId } from '../../../shared/lib/group/utils'
 import type { Coordinates, GroupCreateParams, GroupCreateResponse } from '../../../shared/types'
+import LocationPickerDialog from './components/LocationPickerDialog'
 
 const priceMarks = [
   { value: 0, label: '¥' },
@@ -48,6 +50,7 @@ const HomePage = (): ReactElement => {
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [groupResponse, setGroupResponse] = useState<GroupCreateResponse | null>(null)
+  const [isMapDialogOpen, setIsMapDialogOpen] = useState(false)
   const progressTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -128,6 +131,16 @@ const HomePage = (): ReactElement => {
     )
   }
 
+  const handleLocationSelected = (coords: Coordinates) => {
+    setLocation(coords)
+    setGeoLoading(false)
+    setError(null)
+  }
+
+  const handleMapDialogClose = () => {
+    setIsMapDialogOpen(false)
+  }
+
   const handleCreateGroup = async () => {
     if (!location) {
       setError('位置情報が取得できていません。')
@@ -199,6 +212,13 @@ const HomePage = (): ReactElement => {
     return 0
   }, [progress])
 
+  const locationText = useMemo(() => {
+    if (!location) {
+      return null
+    }
+    return `緯度: ${location.latitude.toFixed(5)} ／ 経度: ${location.longitude.toFixed(5)}`
+  }, [location])
+
   const handleCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -223,151 +243,192 @@ const HomePage = (): ReactElement => {
           <Stack spacing={3}>
             {error && <Alert severity="error">{error}</Alert>}
 
-            {geoLoading ? (
-              <Stack direction="row" alignItems="center" spacing={2} justifyContent="center" sx={{ mt: 4 }}>
-                <CircularProgress size={32} />
-                <Typography>位置情報を取得しています…</Typography>
-              </Stack>
-            ) : (
-              <>
-                <Card>
-                  <CardContent>
-                    <Stack spacing={2}>
-                      <Typography variant="h6">グループ情報</Typography>
-                      <TextField
-                        label="グループ名（任意）"
-                        value={groupName}
-                        onChange={(event) => setGroupName(event.target.value)}
-                        placeholder="例）金曜飲み会"
-                        fullWidth
-                      />
-                      <TextField
-                        required
-                        label="幹事のニックネーム"
-                        value={organizerName}
-                        onChange={(event) => setOrganizerName(event.target.value)}
-                        placeholder="例）たべこ"
-                        helperText="メンバーIDの生成に利用します"
-                        fullWidth
-                      />
+            <Card>
+              <CardContent>
+                <Stack spacing={2}>
+                  <Typography variant="h6">検索起点</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    グループ検索の中心となる場所を指定してください。
+                  </Typography>
 
-                      <Box>
-                        <Typography gutterBottom>検索範囲（{radius} m）</Typography>
-                        <Slider
-                          min={300}
-                          max={3000}
-                          step={100}
-                          value={radius}
-                          onChange={(_event, value) => {
-                            if (typeof value === 'number') {
-                              setRadius(value)
-                            }
-                          }}
-                          valueLabelDisplay="auto"
-                        />
-                      </Box>
-
-                      <Box>
-                        <Typography gutterBottom>価格帯</Typography>
-                        <Slider
-                          value={priceRange}
-                          onChange={(_event, value) => {
-                            if (Array.isArray(value) && value.length === 2) {
-                              setPriceRange([value[0], value[1]])
-                            }
-                          }}
-                          min={0}
-                          max={4}
-                          step={1}
-                          marks={priceMarks}
-                          valueLabelDisplay="auto"
-                        />
-                      </Box>
-
-                      <Button
-                        variant="contained"
-                        size="large"
-                        onClick={handleCreateGroup}
-                        disabled={loading || !organizerName.trim()}
-                      >
-                        {loading ? '作成中…' : <Typography component='span' sx={{ color: '#FFFFFF', fontWeight: 600 }}>この条件でグループを作成</Typography>}
-                      </Button>
-                      {loading && (
-                        <Box sx={{ width: '100%' }}>
-                          {progress > 0 ? (
-                            <LinearProgress variant="determinate" value={Math.min(progress, 100)} />
-                          ) : (
-                            <LinearProgress variant="indeterminate" />
-                          )}
-                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                            {progressLabel}
-                          </Typography>
-                          <Stack
-                            direction="row"
-                            justifyContent="center"
-                            alignItems="flex-end"
-                            spacing={1.5}
-                            sx={{ mt: 2 }}
-                          >
-                            <Fade in={visibleMascots >= 1} timeout={{ enter: 500 }} style={{ display: 'flex' }}>
-                              <Box
-                                component="img"
-                                src="/moguwan.png"
-                                alt="Moguwan enjoying snacks"
-                                sx={{
-                                  width: 60,
-                                  height: 60,
-                                  borderRadius: '14px',
-                                  boxShadow: '0 12px 22px rgba(255, 140, 66, 0.2)',
-                                  transform: 'rotate(-6deg)',
-                                }}
-                              />
-                            </Fade>
-                            <Fade in={visibleMascots >= 2} timeout={{ enter: 650 }} style={{ display: 'flex' }}>
-                              <Box
-                                component="img"
-                                src="/moguwan_hatena.png"
-                                alt="Moguwan wondering"
-                                sx={{
-                                  width: 60,
-                                  height: 60,
-                                  borderRadius: '18px',
-                                  boxShadow: '0 12px 22px rgba(255, 140, 66, 0.2)',
-                                  transform: 'rotate(-2deg)',
-                                }}
-                              />
-                            </Fade>
-                            <Fade in={visibleMascots >= 3} timeout={{ enter: 800 }} style={{ display: 'flex' }}>
-                              <Box
-                                component="img"
-                                src="/moguwan_mogu2.png"
-                                alt="Moguwan enjoying snacks"
-                                sx={{
-                                  width: 58,
-                                  height: 58,
-                                  borderRadius: '50%',
-                                  boxShadow: '0 10px 20px rgba(53, 80, 112, 0.16)',
-                                  transform: 'rotate(5deg)',
-                                }}
-                              />
-                            </Fade>
-                          </Stack>
-                        </Box>
-                      )}
+                  {geoLoading && (
+                    <Stack direction="row" alignItems="center" spacing={1.5}>
+                      <CircularProgress size={20} />
+                      <Typography variant="body2" color="text.secondary">
+                        現在地を取得しています…
+                      </Typography>
                     </Stack>
-                  </CardContent>
-                </Card>
+                  )}
 
-                <Button
-                  variant="outlined"
-                  startIcon={<MyLocationIcon />}
-                  onClick={handleRetryLocation}
-                  disabled={geoLoading}
-                >
-                  位置情報を再取得
-                </Button>
-              </>
-            )}
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1.5,
+                      borderRadius: 2,
+                      bgcolor: (theme) => theme.palette.action.hover,
+                    }}
+                  >
+                    {locationText ? (
+                      <Typography variant="body2">{locationText}</Typography>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        検索起点が未設定です。現在地を取得するか地図から選択してください。
+                      </Typography>
+                    )}
+                  </Box>
+
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<MyLocationIcon />}
+                      onClick={handleRetryLocation}
+                      disabled={geoLoading}
+                    >
+                      現在地から取得
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<MapIcon />}
+                      onClick={() => setIsMapDialogOpen(true)}
+                    >
+                      地図から選ぶ
+                    </Button>
+                  </Stack>
+                </Stack>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent>
+                <Stack spacing={2}>
+                  <Typography variant="h6">グループ情報</Typography>
+                  <TextField
+                    label="グループ名（任意）"
+                    value={groupName}
+                    onChange={(event) => setGroupName(event.target.value)}
+                    placeholder="例）金曜飲み会"
+                    fullWidth
+                  />
+                  <TextField
+                    required
+                    label="幹事のニックネーム"
+                    value={organizerName}
+                    onChange={(event) => setOrganizerName(event.target.value)}
+                    placeholder="例）たべこ"
+                    helperText="メンバーIDの生成に利用します"
+                    fullWidth
+                  />
+
+                  <Box>
+                    <Typography gutterBottom>検索範囲（{radius} m）</Typography>
+                    <Slider
+                      min={300}
+                      max={3000}
+                      step={100}
+                      value={radius}
+                      onChange={(_event, value) => {
+                        if (typeof value === 'number') {
+                          setRadius(value)
+                        }
+                      }}
+                      valueLabelDisplay="auto"
+                    />
+                  </Box>
+
+                  <Box>
+                    <Typography gutterBottom>価格帯</Typography>
+                    <Slider
+                      value={priceRange}
+                      onChange={(_event, value) => {
+                        if (Array.isArray(value) && value.length === 2) {
+                          setPriceRange([value[0], value[1]])
+                        }
+                      }}
+                      min={0}
+                      max={4}
+                      step={1}
+                      marks={priceMarks}
+                      valueLabelDisplay="auto"
+                    />
+                  </Box>
+
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={handleCreateGroup}
+                    disabled={loading || !organizerName.trim()}
+                  >
+                    {loading ? '作成中…' : (
+                      <Typography component="span" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
+                        この条件でグループを作成
+                      </Typography>
+                    )}
+                  </Button>
+                  {loading && (
+                    <Box sx={{ width: '100%' }}>
+                      {progress > 0 ? (
+                        <LinearProgress variant="determinate" value={Math.min(progress, 100)} />
+                      ) : (
+                        <LinearProgress variant="indeterminate" />
+                      )}
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                        {progressLabel}
+                      </Typography>
+                      <Stack
+                        direction="row"
+                        justifyContent="center"
+                        alignItems="flex-end"
+                        spacing={1.5}
+                        sx={{ mt: 2 }}
+                      >
+                        <Fade in={visibleMascots >= 1} timeout={{ enter: 500 }} style={{ display: 'flex' }}>
+                          <Box
+                            component="img"
+                            src="/moguwan.png"
+                            alt="Moguwan enjoying snacks"
+                            sx={{
+                              width: 60,
+                              height: 60,
+                              borderRadius: '14px',
+                              boxShadow: '0 12px 22px rgba(255, 140, 66, 0.2)',
+                              transform: 'rotate(-6deg)',
+                            }}
+                          />
+                        </Fade>
+                        <Fade in={visibleMascots >= 2} timeout={{ enter: 650 }} style={{ display: 'flex' }}>
+                          <Box
+                            component="img"
+                            src="/moguwan_hatena.png"
+                            alt="Moguwan wondering"
+                            sx={{
+                              width: 60,
+                              height: 60,
+                              borderRadius: '18px',
+                              boxShadow: '0 12px 22px rgba(255, 140, 66, 0.2)',
+                              transform: 'rotate(-2deg)',
+                            }}
+                          />
+                        </Fade>
+                        <Fade in={visibleMascots >= 3} timeout={{ enter: 800 }} style={{ display: 'flex' }}>
+                          <Box
+                            component="img"
+                            src="/moguwan_mogu2.png"
+                            alt="Moguwan enjoying snacks"
+                            sx={{
+                              width: 58,
+                              height: 58,
+                              borderRadius: '50%',
+                              boxShadow: '0 10px 20px rgba(53, 80, 112, 0.16)',
+                              transform: 'rotate(5deg)',
+                            }}
+                          />
+                        </Fade>
+                      </Stack>
+                    </Box>
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
 
             {groupResponse && organizerLink && (
               <Card>
@@ -424,6 +485,12 @@ const HomePage = (): ReactElement => {
           </Stack>
         </Box>
       </PhoneContainer>
+      <LocationPickerDialog
+        open={isMapDialogOpen}
+        onClose={handleMapDialogClose}
+        onSelect={handleLocationSelected}
+        initialLocation={location}
+      />
     </AppContainer>
   )
 }
